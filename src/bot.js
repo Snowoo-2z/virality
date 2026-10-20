@@ -18,6 +18,8 @@ const {
 const configPanel = require('./configPanel');
 const { sendWelcome, applyAutoRole } = require('./welcome');
 const { getConfig, saveConfig } = require('./config');
+const tickets = require('./tickets');
+const { buildEmbedPayload } = require('./embeds');
 
 const GUILD_ID = (process.env.GUILD_ID || '1562033502612885534').trim();
 
@@ -91,9 +93,17 @@ function createClient() {
   client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.guildId !== GUILD_ID) return;
     try {
-      await configPanel.handleInteraction(interaction);
+      if (interaction.customId?.startsWith('ticket:')) {
+        await tickets.handleInteraction(interaction);
+      } else {
+        await configPanel.handleInteraction(interaction);
+      }
     } catch (err) {
-      console.error('❌ Erreur pendant une interaction /config :', err);
+      console.error('❌ Erreur pendant une interaction (bouton/menu) :', err);
+      // Réponse de secours si l'interaction est encore en attente
+      const fallback = { content: '❌ Oups, quelque chose a coincé. Réessaie, et si ça persiste, préviens un admin !', flags: 64 };
+      if (interaction.deferred && !interaction.replied) await interaction.editReply(fallback).catch(() => {});
+      else if (!interaction.replied && !interaction.deferred) await interaction.reply(fallback).catch(() => {});
     }
   });
 
@@ -158,6 +168,7 @@ function getGuildInfo() {
     guildIcon: null,
     memberCount: null,
     channels: [],
+    categories: [],
     roles: [],
     inviteUrl: null,
   };
@@ -178,6 +189,11 @@ function getGuildInfo() {
 
   base.channels = guild.channels.cache
     .filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement)
+    .sort((a, b) => a.rawPosition - b.rawPosition)
+    .map((c) => ({ id: c.id, name: c.name }));
+
+  base.categories = guild.channels.cache
+    .filter((c) => c.type === ChannelType.GuildCategory)
     .sort((a, b) => a.rawPosition - b.rawPosition)
     .map((c) => ({ id: c.id, name: c.name }));
 
@@ -621,4 +637,74 @@ async function buildServerStructure() {
   return { ok: results.some((r) => r.status !== 'error'), results, config: getConfig() };
 }
 
-module.exports = { startBot, getGuildInfo, sendTestWelcome, applyRolesStyle, buildServerStructure, GUILD_ID };
+/* ---------------- Tickets + Embeds (actions du dashboard) ---------------- */
+
+/** Retrouve le serveur Virality si le bot est en ligne, sinon message clair. */
+function requireGuild() {
+  if (!client || !isReady) {
+    return { error: 'Le bot est hors ligne. Vérifie le token dans le fichier .env puis redémarre le bot.' };
+  }
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) {
+    return { error: 'Le bot n\'est pas sur le serveur Virality. Utilise le lien d\'invitation affiché en haut du dashboard.' };
+  }
+  return { guild };
+}
+
+/** Publie/met à jour le panneau de tickets (bouton du dashboard). */
+async function publishTicketPanel() {
+  const { guild, error } = requireGuild();
+  if (error) return { ok: false, reason: error };
+  try {
+    const result = await tickets.publishPanel(guild);
+    if (result.ok) return { ...result, config: getConfig() };
+    return result;
+  } catch (err) {
+    return { ok: false, reason: `Publication impossible : ${err.message} (le bot a-t-il le droit d'écrire dans ce salon ?)` };
+  }
+}
+
+/** Envoie un modèle d'embed du créateur d'embeds dans son salon cible. */
+async function sendEmbedTemplate(index) {
+  const { guild, error } = requireGuild();
+  if (error) return { ok: false, reason: error };
+
+  const template = getConfig().embeds.templates[index];
+  if (!template) return { ok: false, reason: 'Modèle d\'embed introuvable. Recharge la page et réessaie.' };
+  if (!template.channelId) {
+    return { ok: false, reason: 'Choisis d\'abord le salon où envoyer cet embed (liste déroulante en haut du créateur).' };
+  }
+
+  let channel = guild.channels.cache.get(template.channelId)
+    || (await guild.channels.fetch(template.channelId).catch(() => null));
+  if (!channel || typeof channel.send !== 'function') {
+    return { ok: false, reason: 'Salon d\'envoi introuvable. Vérifie ton choix dans la liste des Salons.' };
+  }
+
+  const payload = buildEmbedPayload(
+    template.embed,
+    { guildName: guild.name, memberCount: guild.memberCount },
+    { content: template.content, pingEveryone: template.pingEveryone }
+  );
+  if (!payload) {
+    return { ok: false, reason: 'Cet embed est complètement vide : ajoute au moins un titre, une description, un champ, une image ou un texte.' };
+  }
+
+  try {
+    const sent = await channel.send(payload);
+    return { ok: true, channelName: channel.name, messageId: sent.id };
+  } catch (err) {
+    return { ok: false, reason: `Envoi impossible : ${err.message} (le bot a-t-il le droit d'écrire dans ce salon ?)` };
+  }
+}
+
+module.exports = {
+  startBot,
+  getGuildInfo,
+  sendTestWelcome,
+  applyRolesStyle,
+  buildServerStructure,
+  publishTicketPanel,
+  sendEmbedTemplate,
+  GUILD_ID,
+};

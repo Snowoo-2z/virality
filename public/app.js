@@ -68,6 +68,11 @@ function collectForm() {
     else value = el.value;
     setPath(config, el.dataset.bind, value);
   });
+  // Rôles staff des tickets (cases à cocher, hors système data-bind)
+  if (document.getElementById('ticketStaffRoles')) {
+    config.tickets.staffRoleIds = $$('#ticketStaffRoles input[type="checkbox"]:checked')
+      .map((box) => box.value);
+  }
 }
 
 /* Affiche/masque les blocs selon les réglages (ex : embed vs texte) */
@@ -130,6 +135,7 @@ function fillGuildSelects() {
   roleSelect.disabled = !(guild?.online && guild?.onGuild);
   syncChannelSelect();
   syncRoleSelect();
+  fillGenericSelects();
 }
 
 /* ---------- Rôles du serveur (style en 1 clic) ---------- */
@@ -200,6 +206,275 @@ function renderRolesResult(results) {
   box.innerHTML = '<div class="roles-result">' + results.map((r) =>
     `<div class="roles-result-line ${r.status}">${icons[r.status] || '•'} <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.message)}</div>`
   ).join('') + '</div>';
+}
+
+/* ---------- Listes de Salons/catégories génériques (tickets, embeds) ---------- */
+function fillGenericSelects() {
+  if (!config) return;
+  const online = Boolean(guild?.online && guild?.onGuild);
+
+  $$('select[data-channel-for]').forEach((select) => {
+    const current = String(getPath(config, select.dataset.channelFor) || '');
+    select.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = online ? '— Choisis un salon —' : '— Bot hors ligne : colle l\'ID ci-dessous —';
+    select.appendChild(ph);
+    for (const ch of guild?.channels || []) {
+      const opt = document.createElement('option');
+      opt.value = ch.id;
+      opt.textContent = '# ' + ch.name;
+      select.appendChild(opt);
+    }
+    select.disabled = !online;
+    if ([...select.options].some((o) => o.value === current)) select.value = current;
+  });
+
+  $$('select[data-category-for]').forEach((select) => {
+    const current = String(getPath(config, select.dataset.categoryFor) || '');
+    select.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = online ? '— Créer automatiquement (nom ci-dessous) —' : '— Bot hors ligne : création automatique —';
+    select.appendChild(ph);
+    for (const cat of guild?.categories || []) {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = cat.name;
+      select.appendChild(opt);
+    }
+    select.disabled = !online;
+    if ([...select.options].some((o) => o.value === current)) select.value = current;
+  });
+}
+
+/* ---------------- Tickets : rôles staff (cases à cocher) ---------------- */
+function buildTicketStaffRoles() {
+  const box = $('#ticketStaffRoles');
+  if (!box || !config) return;
+  const online = Boolean(guild?.online && guild?.onGuild && guild.roles?.length);
+  // Bot hors ligne : on montre les rôles connus (ceux de l'onglet Rôles)
+  const source = online
+    ? guild.roles
+    : (config.rolesStyle || []).filter((r) => r.id).map((r) => ({ id: r.id, name: r.name, color: r.color }));
+  if (!source.length) {
+    box.innerHTML = '<p class="hint">Bot hors ligne : impossible de lister les rôles pour le moment.</p>';
+    return;
+  }
+  const selected = new Set(config.tickets.staffRoleIds || []);
+  box.innerHTML = '<div class="check-list">' + source.map((r) => {
+    const dot = /^#[0-9a-fA-F]{6}$/.test(r.color || '') && r.color !== '#000000' ? r.color : '#99aab5';
+    return `<label class="check-chip"><input type="checkbox" value="${r.id}" ${selected.has(r.id) ? 'checked' : ''} /><span class="dotc" style="background:${dot}"></span>${escapeHtml(r.name)}</label>`;
+  }).join('') + '</div>'
+    + (online ? '' : '<p class="hint">Bot hors ligne : liste partielle (rôles connus). La liste complète du serveur arrivera quand le bot sera connecté.</p>');
+}
+
+/* ----------- Fabrique de champs d'embed (réutilisée partout) ----------- */
+function embedInputsHtml(prefix, thumbOptions) {
+  const thumb = thumbOptions.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  return `
+    <label class="field-label">Auteur (petit nom tout en haut, optionnel)</label>
+    <input type="text" data-bind="${prefix}.author" maxlength="256" placeholder="Laisse vide pour ne pas l'afficher" />
+    <label class="field-label">Titre</label>
+    <input type="text" data-bind="${prefix}.title" maxlength="256" />
+    <label class="field-label">Description (texte principal)</label>
+    <textarea data-bind="${prefix}.description" maxlength="4000"></textarea>
+    <label class="field-label">Petit texte en bas (footer)</label>
+    <input type="text" data-bind="${prefix}.footer" maxlength="2048" />
+    <div class="grid-2">
+      <div>
+        <label class="field-label">Couleur de la bordure</label>
+        <div class="color-row">
+          <input type="color" data-bind="${prefix}.color" />
+          <input type="text" data-bind="${prefix}.color" placeholder="#FF6A00" />
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Miniature (petite image en haut à droite)</label>
+        <select data-bind="${prefix}.thumbnail">${thumb}</select>
+      </div>
+    </div>
+    <label class="field-label">URL de la miniature (si « Image personnalisée »)</label>
+    <input type="url" data-bind="${prefix}.thumbnailUrl" placeholder="https://exemple.com/petite-image.png" />
+    <label class="field-label">Grande image</label>
+    <select data-bind="${prefix}.imageMode">
+      <option value="banniere">Bannière Virality (incluse)</option>
+      <option value="aucune">Aucune</option>
+      <option value="url">Image personnalisée (lien URL)</option>
+    </select>
+    <label class="field-label">URL de la grande image (si « Image personnalisée »)</label>
+    <input type="url" data-bind="${prefix}.imageUrl" placeholder="https://exemple.com/mon-image.png" />
+    <div class="switch-row">
+      <div class="txt"><b>Horodatage</b><span>Afficher la date et l'heure en bas de l'embed</span></div>
+      <label class="switch"><input type="checkbox" data-bind="${prefix}.timestamp" /><span class="track"></span></label>
+    </div>`;
+}
+
+function buildTicketForms() {
+  const panel = $('#ticketPanelEmbedForm');
+  if (panel) {
+    panel.innerHTML = embedInputsHtml('tickets.panelEmbed', [
+      ['logo', 'Logo Virality'], ['url', 'Image personnalisée (URL)'], ['aucune', 'Aucune'],
+    ]);
+  }
+  const open = $('#ticketOpenEmbedForm');
+  if (open) {
+    open.innerHTML = embedInputsHtml('tickets.openEmbed', [
+      ['avatar', 'Avatar du membre'], ['logo', 'Logo Virality'], ['url', 'Image personnalisée (URL)'], ['aucune', 'Aucune'],
+    ]);
+  }
+}
+
+/* ---------------- Créateur d'embeds (modèles) ---------------- */
+let embedIndex = 0;
+
+function buildEmbedFields() {
+  const box = $('#embedFieldsList');
+  if (!box) return;
+  const fields = config.embeds.templates[embedIndex]?.embed?.fields || [];
+  box.innerHTML = fields.map((f, j) => `
+    <div class="field-row">
+      <div class="field-row-head"><span>Champ n°${j + 1}</span><button class="field-remove" data-remove-field="${j}" title="Supprimer ce champ">❌</button></div>
+      <label class="field-label">Titre du champ</label>
+      <input type="text" data-bind="embeds.templates.${embedIndex}.embed.fields.${j}.name" maxlength="256" />
+      <label class="field-label">Texte du champ</label>
+      <textarea data-bind="embeds.templates.${embedIndex}.embed.fields.${j}.value" maxlength="1024" style="min-height:52px"></textarea>
+      <div class="switch-row">
+        <div class="txt"><b>Côte à côte</b><span>Afficher ce champ à côté des autres (sinon pleine largeur)</span></div>
+        <label class="switch"><input type="checkbox" data-bind="embeds.templates.${embedIndex}.embed.fields.${j}.inline" /><span class="track"></span></label>
+      </div>
+    </div>`).join('') || '<p class="hint">Aucun champ pour le moment — ce n\'est pas obligatoire !</p>';
+  box.querySelectorAll('[data-remove-field]').forEach((btn) => btn.addEventListener('click', () => {
+    collectForm();
+    config.embeds.templates[embedIndex].embed.fields.splice(Number(btn.dataset.removeField), 1);
+    buildEmbedBuilder();
+  }));
+}
+
+function buildEmbedBuilder() {
+  const form = $('#embedBuilderForm');
+  const select = $('#embedTemplateSelect');
+  if (!form || !select || !Array.isArray(config?.embeds?.templates) || !config.embeds.templates.length) return;
+  embedIndex = Math.min(Math.max(embedIndex, 0), config.embeds.templates.length - 1);
+
+  select.innerHTML = config.embeds.templates
+    .map((t, i) => `<option value="${i}">${escapeHtml(t.name || 'Sans nom')}</option>`).join('');
+  select.value = String(embedIndex);
+
+  const p = `embeds.templates.${embedIndex}`;
+  form.innerHTML = `
+    <label class="field-label">Nom du modèle</label>
+    <input type="text" data-bind="${p}.name" maxlength="80" />
+    <label class="field-label">Salon où envoyer cet embed</label>
+    <select data-channel-for="${p}.channelId"></select>
+    <label class="field-label">...ou colle l'ID du salon à la main</label>
+    <input type="text" data-bind="${p}.channelId" placeholder="Ex : 123456789012345678" />
+    <label class="field-label">Texte au-dessus de l'embed (optionnel)</label>
+    <textarea data-bind="${p}.content" maxlength="2000" placeholder="Ex : @everyone grosse annonce 🔥" style="min-height:56px"></textarea>
+    <div class="switch-row">
+      <div class="txt"><b>Autoriser les mentions</b><span>Permet à @everyone et aux @rôles écrits dans le texte de notifier pour de vrai</span></div>
+      <label class="switch"><input type="checkbox" data-bind="${p}.pingEveryone" /><span class="track"></span></label>
+    </div>
+    ${embedInputsHtml(p + '.embed', [['logo', 'Logo Virality'], ['url', 'Image personnalisée (URL)'], ['aucune', 'Aucune']])}
+    <label class="field-label">Champs (petits blocs titre + texte dans l'embed)</label>
+    <div id="embedFieldsList"></div>
+    <div style="margin-top:10px"><button class="btn btn-ghost btn-sm" id="addFieldBtn">➕ Ajouter un champ</button></div>`;
+
+  buildEmbedFields();
+  fillForm();
+  fillGenericSelects();
+  updateEmbedPreview();
+
+  $('#addFieldBtn').addEventListener('click', () => {
+    collectForm();
+    const fields = config.embeds.templates[embedIndex].embed.fields;
+    if (fields.length >= 10) {
+      showToast('Maximum 10 champs dans le créateur — restons lisibles 😉', true);
+      return;
+    }
+    fields.push({ name: '', value: '', inline: false });
+    buildEmbedBuilder();
+  });
+}
+
+/* ---------------- Aperçus génériques (tickets + embeds) ---------------- */
+function genericThumbUrl(e) {
+  if (e.thumbnail === 'avatar') return 'https://cdn.discordapp.com/embed/avatars/2.png';
+  if (e.thumbnail === 'logo') return '/assets/logo.jpg';
+  if (e.thumbnail === 'url' && /^https?:\/\//i.test(e.thumbnailUrl || '')) return e.thumbnailUrl.trim();
+  return null;
+}
+
+function renderEmbedPreviewInto(box, e, { content = '', buttonHtml = '' } = {}) {
+  if (!box || !e) return;
+  const botName = (guild?.botTag || 'Virality').split('#')[0];
+  const botAvatar = guild?.botAvatar || '/assets/logo.jpg';
+  const timeStr = 'Aujourd\'hui à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  let html = `<div class="discord-msg"><img class="avatar" src="${botAvatar}" alt=""><div class="body">`;
+  html += `<div class="head"><span class="name">${escapeHtml(botName)}</span><span class="bot-tag">BOT</span><span class="time">${timeStr}</span></div>`;
+  if (content?.trim()) html += `<div class="content">${renderText(content)}</div>`;
+
+  const thumb = genericThumbUrl(e);
+  const img = e.imageMode === 'banniere'
+    ? '/assets/banner.png'
+    : (e.imageMode === 'url' && /^https?:\/\//i.test(e.imageUrl || '') ? e.imageUrl.trim() : null);
+  const color = /^#?[0-9a-fA-F]{6}$/.test((e.color || '').trim())
+    ? (e.color.trim().startsWith('#') ? e.color.trim() : '#' + e.color.trim())
+    : '#FF6A00';
+  const fields = (e.fields || []).filter((f) => f.name?.trim() || f.value?.trim());
+  const hasEmbed = e.author?.trim() || e.title?.trim() || e.description?.trim() || img || fields.length;
+
+  if (hasEmbed) {
+    html += `<div class="discord-embed${thumb ? ' with-thumb' : ''}" style="border-left-color:${color}">`;
+    if (e.author?.trim()) html += `<div class="e-author">${renderText(e.author)}</div>`;
+    if (e.title?.trim()) html += `<div class="e-title">${renderText(e.title)}</div>`;
+    if (e.description?.trim()) html += `<div class="e-desc">${renderText(e.description)}</div>`;
+    if (fields.length) {
+      html += '<div class="e-fields">' + fields.map((f) =>
+        `<div class="e-field${f.inline ? '' : ' block'}"><div class="fname">${renderText(f.name)}</div><div class="fvalue">${renderText(f.value)}</div></div>`
+      ).join('') + '</div>';
+    }
+    if (thumb) html += `<img class="e-thumb" src="${thumb}" alt="">`;
+    if (img) html += `<img class="e-image" src="${img}" alt="">`;
+    const footBits = [];
+    if (e.footer?.trim()) footBits.push(renderText(e.footer));
+    if (e.timestamp) footBits.push(timeStr.replace('Aujourd\'hui à ', ''));
+    if (footBits.length) html += `<div class="e-footer">${footBits.join(' • ')}</div>`;
+    html += '</div>';
+  } else if (!content?.trim()) {
+    html += '<div class="preview-empty">(embed vide : ajoute au moins un titre ou une description)</div>';
+  }
+
+  if (buttonHtml) html += buttonHtml;
+  html += '</div></div>';
+  box.innerHTML = html;
+}
+
+let ticketPreviewTab = 'panel';
+function updateTicketPreview() {
+  const box = $('#ticketPreview');
+  if (!box || !config) return;
+  const t = config.tickets;
+  if (ticketPreviewTab === 'panel') {
+    const label = `${t.panelButtonEmoji ? t.panelButtonEmoji + ' ' : ''}${t.panelButtonLabel || 'Ouvrir un ticket'}`;
+    renderEmbedPreviewInto(box, t.panelEmbed, {
+      buttonHtml: `<span class="fake-button">${escapeHtml(label)}</span>`,
+    });
+  } else {
+    renderEmbedPreviewInto(box, t.openEmbed, {
+      content: '{user}' + (t.pingStaff ? ' *(le staff est notifié)*' : ''),
+      buttonHtml: '<span class="fake-button danger">🔒 Fermer le ticket</span>',
+    });
+  }
+}
+
+function updateEmbedPreview() {
+  const box = $('#embedPreview');
+  if (!box || !config) return;
+  const tpl = config.embeds?.templates?.[embedIndex];
+  if (!tpl) return;
+  renderEmbedPreviewInto(box, tpl.embed, { content: tpl.content });
 }
 
 /* ---------- Onglets du dashboard ---------- */
@@ -333,7 +608,9 @@ function renderText(text) {
     .replaceAll('{user}', '\u0001USER\u0001')
     .replaceAll('{username}', s.username)
     .replaceAll('{server}', s.server)
-    .replaceAll('{memberCount}', String(s.memberCount));
+    .replaceAll('{memberCount}', String(s.memberCount))
+    .replaceAll('{number}', '001')
+    .replaceAll('{subject}', 'Ma question');
   out = escapeHtml(out);
   out = out
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
@@ -414,8 +691,12 @@ async function loadAll() {
   await loadGuild();
   buildRoleRows();
   buildServerRows();
+  buildTicketForms();
+  buildEmbedBuilder();
   fillForm();
+  fillGenericSelects();
   updateRoleChips();
+  updateTicketPreview();
   renderPreview();
   loadSystem();
 }
@@ -429,6 +710,7 @@ async function loadGuild() {
   renderStatus();
   fillGuildSelects();
   markRoleStatuses();
+  buildTicketStaffRoles();
 }
 
 /* ---------- Événements ---------- */
@@ -444,6 +726,13 @@ document.addEventListener('input', (e) => {
   collectForm();
   updateConditionalSections();
   updateRoleChips();
+  updateTicketPreview();
+  updateEmbedPreview();
+  // Le nom du modèle d'embed se met à jour dans la liste pendant la frappe
+  if (el.dataset.bind === `embeds.templates.${embedIndex}.name`) {
+    const opt = $('#embedTemplateSelect')?.options[embedIndex];
+    if (opt) opt.textContent = el.value || 'Sans nom';
+  }
   renderPreview();
 });
 
@@ -452,7 +741,23 @@ document.addEventListener('change', (e) => {
   collectForm();
   updateConditionalSections();
   updateRoleChips();
+  updateTicketPreview();
+  updateEmbedPreview();
   renderPreview();
+});
+
+/* Listes déroulantes génériques (Salon/catégorie) + cases des rôles staff */
+document.addEventListener('change', (e) => {
+  if (!config) return;
+  const sel = e.target;
+  const path = sel.dataset?.channelFor || sel.dataset?.categoryFor;
+  if (path) {
+    const input = document.querySelector(`[data-bind="${path}"]`);
+    if (input) input.value = sel.value;
+    collectForm();
+    return;
+  }
+  if (sel.closest?.('#ticketStaffRoles')) collectForm();
 });
 
 $('#channelSelect').addEventListener('change', (e) => {
@@ -482,7 +787,10 @@ $('#saveBtn').addEventListener('click', async () => {
     const data = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
     config = data.config;
     fillForm();
+    fillGenericSelects();
     updateRoleChips();
+    updateTicketPreview();
+    updateEmbedPreview();
     renderPreview();
     showToast('✅ Configuration enregistrée ! Elle est déjà active sur le bot.');
   } catch (err) {
@@ -569,8 +877,101 @@ $('#buildServerBtn').addEventListener('click', async () => {
   }
 });
 
+$$('.ticket-preview-tabs button').forEach((btn) => btn.addEventListener('click', () => {
+  ticketPreviewTab = btn.dataset.tp;
+  $$('.ticket-preview-tabs button').forEach((b) => b.classList.toggle('active', b === btn));
+  updateTicketPreview();
+}));
+
+$('#publishPanelBtn').addEventListener('click', async () => {
+  collectForm();
+  const btn = $('#publishPanelBtn');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Publication en cours sur discord...';
+  try {
+    const saved = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
+    config = saved.config;
+    const data = await api('/api/tickets/publish', { method: 'POST', body: '{}' });
+    if (data.config) config = data.config;
+    fillForm();
+    fillGenericSelects();
+    updateTicketPreview();
+    showToast(data.updated
+      ? `✅ Panneau de tickets mis à jour dans #${data.channelName} !`
+      : `✅ Panneau publié dans #${data.channelName} ! Va cliquer le bouton pour tester 🎫`);
+  } catch (err) {
+    showToast('❌ ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
+$('#embedTemplateSelect').addEventListener('change', (e) => {
+  collectForm();
+  embedIndex = Number(e.target.value) || 0;
+  buildEmbedBuilder();
+});
+
+$('#newTemplateBtn').addEventListener('click', () => {
+  collectForm();
+  config.embeds.templates.push({
+    name: 'Nouveau modèle',
+    channelId: '',
+    content: '',
+    pingEveryone: false,
+    embed: {
+      title: '', description: '', color: '#FF6A00', footer: 'Virality', author: '',
+      imageMode: 'aucune', imageUrl: '', thumbnail: 'logo', thumbnailUrl: '',
+      timestamp: true, fields: [],
+    },
+  });
+  embedIndex = config.embeds.templates.length - 1;
+  buildEmbedBuilder();
+  showToast('➕ Nouveau modèle créé ! Pense à cliquer « 💾 Enregistrer » (onglet Bienvenue) ou à l\'envoyer pour le sauvegarder.');
+});
+
+$('#deleteTemplateBtn').addEventListener('click', () => {
+  if (config.embeds.templates.length <= 1) {
+    showToast('Il faut garder au moins un modèle 😉', true);
+    return;
+  }
+  collectForm();
+  const name = config.embeds.templates[embedIndex]?.name || 'ce modèle';
+  config.embeds.templates.splice(embedIndex, 1);
+  embedIndex = 0;
+  buildEmbedBuilder();
+  showToast(`🗑️ Modèle « ${name} » supprimé. Pense à enregistrer pour confirmer.`);
+});
+
+$('#sendEmbedBtn').addEventListener('click', async () => {
+  collectForm();
+  const btn = $('#sendEmbedBtn');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Envoi en cours...';
+  try {
+    const saved = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
+    config = saved.config;
+    const data = await api('/api/embeds/send', {
+      method: 'POST',
+      body: JSON.stringify({ index: embedIndex }),
+    });
+    showToast(`📤 Embed envoyé dans #${data.channelName} ! Va l'admirer sur discord 👀`);
+  } catch (err) {
+    showToast('❌ ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
 $('#refreshBtn').addEventListener('click', async () => {
+  if (config) collectForm();
   await loadGuild();
+  updateTicketPreview();
+  updateEmbedPreview();
   renderPreview();
   loadSystem();
   showToast('🔄 Statut, Salons et rôles actualisés.');

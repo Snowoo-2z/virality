@@ -2,13 +2,15 @@
 
 Le bot discord officiel du serveur **Virality**. Il gère la **bienvenue**, le **style des rôles** et la **structure complète du serveur**, de 2 façons :
 
-- 🖥️ **Dashboard web** (page dans ton navigateur, protégée par mot de passe) organisé en 3 onglets : **👋 Bienvenue**, **🎨 Rôles du serveur**, **🏗️ Structure & sauvegarde**
+- 🖥️ **Dashboard web** (page dans ton navigateur, protégée par mot de passe) organisé en onglets : **👋 Bienvenue**, **🎨 Rôles**, **🎫 Tickets**, **🧱 Embeds**, **🏗️ Structure & sauvegarde**
 - 💬 **Commande `/config`** directement dans discord (boutons + menus, réservée aux administrateurs) pour la bienvenue
 
 ### Les 3 onglets du dashboard
 
 - **👋 Bienvenue** : le message d'accueil des nouveaux membres (voir détail ci-dessous), avec aperçu en direct
 - **🎨 Rôles du serveur** : en 1 clic, renomme + recolore les rôles du staff aux couleurs Virality et crée les rôles **Accueil**, **Membre** et **Clipper** (noms/couleurs ajustables, permissions inchangées)
+- **🎫 Tickets** : système de support complet — panneau stylé avec bouton publié dans le salon de ton choix, salon privé créé automatiquement pour le membre + les rôles staff cochés, formulaire de sujet optionnel, ping du staff, fermeture avec **transcription** (.txt) dans un salon de logs et/ou en MP. Tout est réglable : noms des Salons (`ticket-{number}` ou `ticket-{user}`), max de tickets par membre, textes et couleurs du panneau et du message d'ouverture
+- **🧱 Embeds** : créateur d'embeds 100 % personnalisable (auteur, titre, description, couleur, footer, grande image, miniature, horodatage, **champs** titre+texte, texte au-dessus, mentions @everyone) avec aperçu en direct, **modèles enregistrables** et envoi en 1 clic dans le salon de ton choix
 - **🏗️ Structure & sauvegarde** : en 1 clic, construis tout le serveur — catégories **📌 Informations** (annonces, bienvenue, à-propos, en lecture seule), **💬 Communauté** (success-flex, proof, tickets) et **🔒 Espace Clipper** privé (commandes, discussion, bonus : les Membres voient sans l'historique, les Clippers voient tout). Le bot ne supprime jamais rien : il crée ce qui manque et range ce qui existe. C'est aussi là qu'on active la **sauvegarde automatique sur Supabase** (optionnelle) : une copie de tes réglages est envoyée à chaque enregistrement, et récupérée toute seule si tu changes de PC (voir les lignes `SUPABASE_...` dans `.env.example` et le fichier `supabase/schema.sql`)
 
 Le bot ne fonctionne **que sur le serveur Virality** (`1562033502612885534`) : si quelqu'un essaie de l'ajouter ailleurs, il quitte le serveur tout seul.

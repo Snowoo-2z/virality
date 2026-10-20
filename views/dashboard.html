@@ -39,7 +39,9 @@
     <!-- ============ NAVIGATION PAR ONGLETS ============ -->
     <nav class="tabs" id="mainTabs">
       <button class="tab-btn active" data-panel="bienvenue">👋 Bienvenue</button>
-      <button class="tab-btn" data-panel="roles">🎨 Rôles du serveur</button>
+      <button class="tab-btn" data-panel="roles">🎨 Rôles</button>
+      <button class="tab-btn" data-panel="tickets">🎫 Tickets</button>
+      <button class="tab-btn" data-panel="embeds">🧱 Embeds</button>
       <button class="tab-btn" data-panel="serveur">🏗️ Structure &amp; sauvegarde</button>
     </nav>
 
@@ -263,6 +265,141 @@
           <button class="btn btn-primary" id="applyRolesBtn">🎨 Enregistrer + appliquer le style aux rôles</button>
         </div>
         <div id="rolesResult"></div>
+      </section>
+    </section>
+
+    <!-- ============ ONGLET : TICKETS ============ -->
+    <section class="tab-panel" id="tab-tickets" style="display:none">
+      <section class="card">
+        <h2>🎫 Tickets — réglages généraux</h2>
+        <p class="desc">Le principe : tu publies un <b>panneau</b> (un joli message avec bouton) dans un salon.
+          Quand un membre clique, un <b>salon privé</b> est créé pour lui et les rôles du staff choisis ci-dessous.
+          Le bouton <b>🔒 Fermer</b> dans le ticket le clôture (avec transcription sauvegarde si tu veux).</p>
+
+        <div class="switch-row">
+          <div class="txt"><b>Système de tickets</b><span>Activer ou couper complètement les tickets (le bouton du panneau répondra « désactivé »)</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.enabled" /><span class="track"></span></label>
+        </div>
+
+        <label class="field-label">Salon où publier le panneau (le message avec le bouton)</label>
+        <select data-channel-for="tickets.panelChannelId"></select>
+        <label class="field-label">...ou colle l'ID du salon à la main</label>
+        <input type="text" data-bind="tickets.panelChannelId" placeholder="Ex : 123456789012345678" />
+        <p class="hint">💡 Si tu as construit le serveur avec l'onglet 🏗️, choisis le salon <b>#🎫・tickets</b>.</p>
+
+        <label class="field-label">Catégorie où créer les Salons de tickets</label>
+        <select data-category-for="tickets.categoryId"></select>
+        <label class="field-label">...ou colle l'ID de la catégorie à la main</label>
+        <input type="text" data-bind="tickets.categoryId" placeholder="Laisse vide pour la créer automatiquement" />
+        <label class="field-label">Nom de la catégorie (créée automatiquement si besoin)</label>
+        <input type="text" data-bind="tickets.categoryName" maxlength="100" />
+
+        <label class="field-label">Rôles du staff qui voient les tickets</label>
+        <div id="ticketStaffRoles"></div>
+        <p class="hint">Ces rôles auront accès à tous les Salons de tickets (et seront notifiés si l'option « ping » est activée).</p>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">Tickets ouverts max par membre</label>
+            <input type="number" data-bind="tickets.maxPerUser" min="1" max="10" />
+          </div>
+          <div>
+            <label class="field-label">Nom des Salons de tickets</label>
+            <input type="text" data-bind="tickets.namePattern" maxlength="60" placeholder="ticket-{number}" />
+            <p class="hint">Variables : <code class="var">{number}</code> = 001, 002... <code class="var">{user}</code> = pseudo. Ex : <code class="var">ticket-{user}</code></p>
+          </div>
+        </div>
+
+        <div class="switch-row">
+          <div class="txt"><b>Demander le sujet</b><span>Petit formulaire « Sujet de ta demande » avant d'ouvrir le ticket</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.askSubject" /><span class="track"></span></label>
+        </div>
+        <div class="switch-row">
+          <div class="txt"><b>Notifier le staff (ping)</b><span>Les rôles staff sont mentionnés à l'ouverture d'un ticket</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.pingStaff" /><span class="track"></span></label>
+        </div>
+
+        <label class="field-label">Salon de logs pour les transcriptions (optionnel)</label>
+        <select data-channel-for="tickets.transcriptChannelId"></select>
+        <label class="field-label">...ou colle l'ID à la main</label>
+        <input type="text" data-bind="tickets.transcriptChannelId" placeholder="Vide = pas de transcription dans un salon" />
+        <p class="hint">À la fermeture d'un ticket, un résumé + le fichier de la conversation (.txt) y seront envoyés. Pense à mettre ce salon en privé staff !</p>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">Délai avant suppression du salon fermé (secondes)</label>
+            <input type="number" data-bind="tickets.closeDelaySeconds" min="0" max="60" />
+          </div>
+          <div>
+            <div class="switch-row" style="margin-top:34px">
+              <div class="txt"><b>Transcription en MP</b><span>L'envoyer aussi au membre en message privé</span></div>
+              <label class="switch"><input type="checkbox" data-bind="tickets.dmTranscript" /><span class="track"></span></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>🖼️ Le panneau (message public avec le bouton)</h2>
+        <p class="desc">C'est ce que les membres verront dans le salon choisi. Variables possibles : <code class="var">{server}</code> <code class="var">{memberCount}</code>.</p>
+        <div class="grid-2">
+          <div>
+            <label class="field-label">Texte du bouton</label>
+            <input type="text" data-bind="tickets.panelButtonLabel" maxlength="80" />
+          </div>
+          <div>
+            <label class="field-label">Emoji du bouton</label>
+            <input type="text" data-bind="tickets.panelButtonEmoji" maxlength="16" placeholder="🎫" />
+          </div>
+        </div>
+        <div id="ticketPanelEmbedForm"></div>
+      </section>
+
+      <section class="card">
+        <h2>💬 Message d'ouverture (dans le ticket)</h2>
+        <p class="desc">Le premier message dans le salon privé du ticket. Variables possibles : <code class="var">{user}</code> <code class="var">{username}</code> <code class="var">{number}</code> (n° du ticket) <code class="var">{subject}</code> <code class="var">{server}</code>.</p>
+        <div id="ticketOpenEmbedForm"></div>
+      </section>
+
+      <section class="card">
+        <h2>👀 Aperçu + publication</h2>
+        <div class="preview-tabs ticket-preview-tabs">
+          <button data-tp="panel" class="active">Le panneau</button>
+          <button data-tp="open">L'ouverture du ticket</button>
+        </div>
+        <div class="discord-window" id="ticketPreview"></div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" id="publishPanelBtn">🚀 Enregistrer + publier le panneau sur discord</button>
+        </div>
+        <p class="hint">Recliquer ce bouton <b>met à jour</b> le panneau existant au lieu d'en poster un deuxième. N'oublie pas : le bot doit avoir « Gérer les Salons » pour créer les Salons de tickets.</p>
+      </section>
+    </section>
+
+    <!-- ============ ONGLET : EMBEDS ============ -->
+    <section class="tab-panel" id="tab-embeds" style="display:none">
+      <section class="card">
+        <h2>🧱 Créateur d'embeds</h2>
+        <p class="desc">Compose un bel encadré coloré (annonce, règlement, info...), regarde l'aperçu,
+          puis envoie-le dans le salon de ton choix. Tu peux garder <b>plusieurs modèles</b> et les renvoyer quand tu veux.
+          Variables : <code class="var">{server}</code> <code class="var">{memberCount}</code>.</p>
+
+        <label class="field-label">Modèle à modifier</label>
+        <div class="template-bar">
+          <select id="embedTemplateSelect"></select>
+          <button class="btn btn-ghost btn-sm" id="newTemplateBtn">➕ Nouveau</button>
+          <button class="btn btn-ghost btn-sm" id="deleteTemplateBtn">🗑️ Supprimer</button>
+        </div>
+
+        <div id="embedBuilderForm"></div>
+      </section>
+
+      <section class="card">
+        <h2>👀 Aperçu en direct</h2>
+        <div class="discord-window" id="embedPreview"></div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" id="sendEmbedBtn">📤 Enregistrer + envoyer sur discord</button>
+        </div>
+        <p class="hint">Le modèle est enregistré automatiquement avant l'envoi. L'embed part dans le salon choisi plus haut : pense à vérifier le salon avant de cliquer !</p>
       </section>
     </section>
 

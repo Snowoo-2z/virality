@@ -134,6 +134,24 @@ function startDashboard() {
     res.json({ ok: true, results: result.results, config: result.config });
   });
 
+  // Publie (ou met à jour) le panneau de tickets dans le salon configuré
+  app.post('/api/tickets/publish', requireAuthApi, async (req, res) => {
+    const result = await bot.publishTicketPanel();
+    if (!result.ok) return res.status(400).json({ error: result.reason || 'Publication impossible.' });
+    res.json({ ok: true, updated: Boolean(result.updated), channelName: result.channelName, config: result.config });
+  });
+
+  // Envoie un modèle d'embed (créateur d'embeds) dans son salon cible
+  app.post('/api/embeds/send', requireAuthApi, async (req, res) => {
+    const index = Number(req.body?.index);
+    if (!Number.isInteger(index) || index < 0) {
+      return res.status(400).json({ error: 'Modèle d\'embed invalide.' });
+    }
+    const result = await bot.sendEmbedTemplate(index);
+    if (!result.ok) return res.status(400).json({ error: result.reason });
+    res.json({ ok: true, channelName: result.channelName, messageId: result.messageId });
+  });
+
   // État du système (sauvegarde locale + miroir Supabase) pour l'onglet Serveur
   app.get('/api/system', requireAuthApi, (req, res) => {
     res.json({

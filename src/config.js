@@ -169,6 +169,100 @@ const DEFAULTS = {
       },
     ],
   },
+
+  /**
+   * Système de tickets (onglet Tickets du dashboard).
+   * Un panneau avec bouton est publié dans un salon ; au clic, un salon
+   * privé est créé pour le membre + les rôles staff choisis.
+   * Compteur et IDs du panneau/catégorie sont mémorisés ici.
+   */
+  tickets: {
+    enabled: true,
+    panelChannelId: '',
+    panelMessageId: '',
+    categoryId: '',
+    categoryName: '🎫・Tickets',
+    staffRoleIds: [
+      '1562040635345735751', // Fondateur
+      '1562040762722553876', // Gérant Modération
+      '1562040845689946122', // modérateur
+      '1562040906603823124', // modérateur en Test
+    ],
+    maxPerUser: 1,
+    namePattern: 'ticket-{number}',
+    counter: 0,
+    askSubject: true,
+    pingStaff: true,
+    closeDelaySeconds: 5,
+    transcriptChannelId: '',
+    dmTranscript: false,
+    panelButtonLabel: 'Ouvrir un ticket',
+    panelButtonEmoji: '🎫',
+    panelEmbed: {
+      title: '🎫 Besoin d\'aide ? Ouvre un ticket !',
+      description:
+        'Une question, un souci, une commande spéciale ?\n\n' +
+        'Clique sur le bouton **« Ouvrir un ticket »** ci-dessous : un salon privé ' +
+        'sera créé rien que pour toi et l\'équipe **Virality** 🔥\n\n' +
+        '⏱️ On te répond le plus vite possible !',
+      color: '#FF6A00',
+      footer: 'Virality • Support',
+      author: '',
+      imageMode: 'banniere', // 'aucune' | 'banniere' | 'url'
+      imageUrl: '',
+      thumbnail: 'logo', // 'logo' | 'url' | 'aucune'
+      thumbnailUrl: '',
+      timestamp: false,
+      fields: [],
+    },
+    openEmbed: {
+      title: '🎫 Ticket ouvert — bienvenue !',
+      description:
+        'Salut {user} 👋\n\nDécris ton souci ou ta demande le plus clairement possible, ' +
+        'un membre de l\'équipe arrive très vite.\n\n' +
+        'Quand tout est réglé, clique sur **🔒 Fermer le ticket**.',
+      color: '#FF6A00',
+      footer: 'Virality • Ticket n°{number}',
+      author: '',
+      imageMode: 'aucune',
+      imageUrl: '',
+      thumbnail: 'avatar', // 'avatar' | 'logo' | 'url' | 'aucune'
+      thumbnailUrl: '',
+      timestamp: true,
+      fields: [],
+    },
+  },
+
+  /**
+   * Créateur d'embeds (onglet Embeds du dashboard) : des modèles
+   * d'embeds entièrement personnalisables, envoyables en 1 clic
+   * dans le salon de ton choix.
+   */
+  embeds: {
+    templates: [
+      {
+        name: '📢 Annonce (exemple)',
+        channelId: '',
+        content: '',
+        pingEveryone: false,
+        embed: {
+          title: '🔥 Grande nouvelle !',
+          description:
+            'Écris ton annonce ici...\n\nTu peux utiliser **gras**, *italique*, des emojis 🚀 ' +
+            'et les variables {server} et {memberCount}.',
+          color: '#FF6A00',
+          footer: 'Virality',
+          author: '',
+          imageMode: 'banniere',
+          imageUrl: '',
+          thumbnail: 'logo',
+          thumbnailUrl: '',
+          timestamp: true,
+          fields: [],
+        },
+      },
+    ],
+  },
 };
 
 function deepMerge(target, source) {
@@ -256,6 +350,85 @@ function normalizeServerStructure(input) {
   };
 }
 
+/**
+ * Valide un embed "générique" (tickets + créateur d'embeds) :
+ * comme l'embed de bienvenue, mais avec auteur, champs et horodatage.
+ */
+function normalizeGenericEmbed(embed, defaults) {
+  if (!embed || typeof embed !== 'object') return structuredClone(defaults);
+  const fields = Array.isArray(embed.fields)
+    ? embed.fields.slice(0, 25).map((f) => ({
+        name: String(f?.name ?? '').slice(0, 256),
+        value: String(f?.value ?? '').slice(0, 1024),
+        inline: Boolean(f?.inline),
+      }))
+    : [];
+  return {
+    title: String(embed.title ?? defaults.title).slice(0, 256),
+    description: String(embed.description ?? defaults.description).slice(0, 4000),
+    color: normalizeColor(embed.color, defaults.color),
+    footer: String(embed.footer ?? defaults.footer).slice(0, 2048),
+    author: String(embed.author ?? defaults.author ?? '').slice(0, 256),
+    imageMode: ['aucune', 'banniere', 'url'].includes(embed.imageMode)
+      ? embed.imageMode
+      : defaults.imageMode,
+    imageUrl: String(embed.imageUrl ?? '').trim().slice(0, 1000),
+    thumbnail: ['avatar', 'logo', 'url', 'aucune'].includes(embed.thumbnail)
+      ? embed.thumbnail
+      : defaults.thumbnail,
+    thumbnailUrl: String(embed.thumbnailUrl ?? '').trim().slice(0, 1000),
+    timestamp: Boolean(embed.timestamp ?? defaults.timestamp),
+    fields,
+  };
+}
+
+function normalizeTickets(input) {
+  const def = DEFAULTS.tickets;
+  const t = input && typeof input === 'object' ? input : {};
+  const intInRange = (v, min, max, fallback) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback;
+  };
+  return {
+    enabled: Boolean(t.enabled ?? def.enabled),
+    panelChannelId: String(t.panelChannelId ?? '').trim(),
+    panelMessageId: String(t.panelMessageId ?? '').trim(),
+    categoryId: String(t.categoryId ?? '').trim(),
+    categoryName: String(t.categoryName ?? def.categoryName).trim().slice(0, 100) || def.categoryName,
+    staffRoleIds: Array.isArray(t.staffRoleIds)
+      ? [...new Set(t.staffRoleIds.map((x) => String(x).trim()).filter(Boolean))].slice(0, 25)
+      : [...def.staffRoleIds],
+    maxPerUser: intInRange(t.maxPerUser, 1, 10, def.maxPerUser),
+    namePattern: String(t.namePattern ?? def.namePattern).trim().slice(0, 60) || def.namePattern,
+    counter: intInRange(t.counter, 0, 999999, 0),
+    askSubject: Boolean(t.askSubject ?? def.askSubject),
+    pingStaff: Boolean(t.pingStaff ?? def.pingStaff),
+    closeDelaySeconds: intInRange(t.closeDelaySeconds, 0, 60, def.closeDelaySeconds),
+    transcriptChannelId: String(t.transcriptChannelId ?? '').trim(),
+    dmTranscript: Boolean(t.dmTranscript ?? def.dmTranscript),
+    panelButtonLabel: String(t.panelButtonLabel ?? def.panelButtonLabel).trim().slice(0, 80) || def.panelButtonLabel,
+    panelButtonEmoji: String(t.panelButtonEmoji ?? def.panelButtonEmoji).trim().slice(0, 16),
+    panelEmbed: normalizeGenericEmbed(t.panelEmbed, def.panelEmbed),
+    openEmbed: normalizeGenericEmbed(t.openEmbed, def.openEmbed),
+  };
+}
+
+function normalizeEmbeds(input) {
+  const defTemplate = DEFAULTS.embeds.templates[0];
+  const fromUser = input && Array.isArray(input.templates) ? input.templates : [];
+  const templates = fromUser.slice(0, 25).map((tpl) => {
+    const t = tpl && typeof tpl === 'object' ? tpl : {};
+    return {
+      name: String(t.name ?? 'Sans nom').trim().slice(0, 80) || 'Sans nom',
+      channelId: String(t.channelId ?? '').trim(),
+      content: String(t.content ?? '').slice(0, 2000),
+      pingEveryone: Boolean(t.pingEveryone),
+      embed: normalizeGenericEmbed(t.embed, defTemplate.embed),
+    };
+  });
+  return { templates: templates.length ? templates : structuredClone(DEFAULTS.embeds.templates) };
+}
+
 /** Nettoie/valide une config complète (utilisée par le dashboard web). */
 function normalizeConfig(input) {
   const base = structuredClone(DEFAULTS);
@@ -283,6 +456,8 @@ function normalizeConfig(input) {
 
   merged.rolesStyle = normalizeRolesStyle(merged.rolesStyle);
   merged.serverStructure = normalizeServerStructure(merged.serverStructure);
+  merged.tickets = normalizeTickets(merged.tickets);
+  merged.embeds = normalizeEmbeds(merged.embeds);
   return merged;
 }
 
