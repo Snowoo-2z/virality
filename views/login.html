@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Virality Bot — Connexion</title>
+  <link rel="icon" href="/assets/logo.jpg" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <img class="logo" src="/assets/logo.jpg" alt="Logo Virality" />
+      <h1>virality<span class="grad">®</span></h1>
+      <p class="sub">Dashboard du bot discord<br />Connecte-toi pour configurer le bot.</p>
+
+      <div class="login-error" id="error"></div>
+
+      <form id="loginForm">
+        <label class="field-label" for="password" style="text-align:left">Mot de passe</label>
+        <input type="password" id="password" placeholder="Ton mot de passe (fichier .env)" autocomplete="current-password" required />
+        <div style="height:16px"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">🔓 Se connecter</button>
+      </form>
+
+      <p class="hint" style="margin-top:16px;text-align:left">
+        Le mot de passe est celui de <code>DASHBOARD_PASSWORD</code> dans le fichier <code>.env</code>.
+        Si tu ne l'as pas défini, il est affiché dans la fenêtre noire du bot au démarrage.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorBox = document.getElementById('error');
+    const btn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Connexion...';
+      try {
+        const res = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: document.getElementById('password').value }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Erreur de connexion.');
+        window.location.href = '/';
+      } catch (err) {
+        errorBox.textContent = '❌ ' + err.message;
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '🔓 Se connecter';
+      }
+    });
+  </script>
+</body>
+</html>
