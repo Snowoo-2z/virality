@@ -242,12 +242,14 @@ const DEFAULTS = {
     /**
      * Assistante IA des tickets (Mistral). La clé API reste dans le .env
      * (MISTRAL_API_KEY), jamais dans cette config. Le modèle par défaut
-     * correspond aux limites annoncées : 250 000 tokens/min, 1 req/s —
-     * le bot espace donc ses appels d'un peu plus d'1 seconde.
+     * est Ministral 3 14B — le bot espace ses appels d'un peu plus
+     * d'1 seconde pour rester sous 1 requête/seconde.
      */
     ai: {
       enabled: false,
-      model: 'mistral-large-2512',
+      model: 'ministral-14b-2512',
+      // Bascule automatique de l'ancien modèle par défaut vers Ministral 14B (faite une seule fois)
+      modelMigratedToMinistral14B: false,
       // 'messages' = répond aux messages du membre | 'mention' = seulement si @bot | 'accueil' = message IA à l'ouverture uniquement
       trigger: 'messages',
       greetOnOpen: true,
@@ -554,9 +556,17 @@ function normalizeTicketAi(input) {
     return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback;
   };
   const temp = Number(a.temperature);
+  const savedModel = String(a.model ?? def.model).trim().slice(0, 80);
+  // Les anciennes installations avaient Mistral Large comme modèle par défaut :
+  // on les bascule une fois vers Ministral 14B. Le champ reste ensuite libre
+  // dans le dashboard si l'utilisateur veut choisir un autre modèle.
+  const model = !a.modelMigratedToMinistral14B && savedModel === 'mistral-large-2512'
+    ? def.model
+    : savedModel;
   return {
     enabled: Boolean(a.enabled ?? def.enabled),
-    model: String(a.model ?? def.model).trim().slice(0, 80) || def.model,
+    model: model || def.model,
+    modelMigratedToMinistral14B: true,
     trigger: ['messages', 'mention', 'accueil'].includes(a.trigger) ? a.trigger : def.trigger,
     greetOnOpen: Boolean(a.greetOnOpen ?? def.greetOnOpen),
     pauseWhenStaffReplies: Boolean(a.pauseWhenStaffReplies ?? def.pauseWhenStaffReplies),

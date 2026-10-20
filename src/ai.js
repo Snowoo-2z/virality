@@ -11,7 +11,7 @@
  */
 
 const API_URL = 'https://api.mistral.ai/v1/chat/completions';
-const DEFAULT_MODEL = 'mistral-large-2512';
+const DEFAULT_MODEL = 'ministral-14b-2512';
 const MIN_INTERVAL_MS = 1100; // 1 requête / seconde max -> petite marge
 const TIMEOUT_MS = 30000;
 
@@ -68,7 +68,7 @@ async function callMistral({ model, messages, temperature, maxTokens }) {
       Authorization: `Bearer ${process.env.MISTRAL_API_KEY.trim()}`,
     },
     body: JSON.stringify({
-      model: model || 'mistral-large-2512',
+      model: model || DEFAULT_MODEL,
       messages,
       temperature: typeof temperature === 'number' ? temperature : 0.7,
       max_tokens: maxTokens || 450,
