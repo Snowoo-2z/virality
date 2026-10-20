@@ -156,6 +156,7 @@ function startDashboard() {
   app.get('/api/system', requireAuthApi, (req, res) => {
     res.json({
       supabase: require('./supabase').status(),
+      ai: bot.getAiRuntime(),
       guildId: bot.GUILD_ID,
     });
   });

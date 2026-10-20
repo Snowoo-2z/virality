@@ -20,21 +20,31 @@ const { sendWelcome, applyAutoRole } = require('./welcome');
 const { getConfig, saveConfig } = require('./config');
 const tickets = require('./tickets');
 const { buildEmbedPayload } = require('./embeds');
+const ai = require('./ai');
 
 const GUILD_ID = (process.env.GUILD_ID || '1562033502612885534').trim();
 
 let client = null;
 let isReady = false;
+let messageIntentsAtBoot = false; // l'IA des tickets lit les messages : intents décidés au démarrage
 
 function createClient() {
-  client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      // Obligatoire pour détecter l'arrivée des nouveaux membres.
-      // À activer aussi sur le portail développeur : "SERVER MEMBERS INTENT".
-      GatewayIntentBits.GuildMembers,
-    ],
-  });
+  // L'IA des tickets doit LIRE les messages des membres : ces intents ne
+  // peuvent être choisis qu'ici, au démarrage. Si l'IA est activée dans la
+  // config, on les demande (MESSAGE CONTENT INTENT à cocher sur le
+  // portail développeur discord). Sinon on garde le minimum.
+  messageIntentsAtBoot = Boolean(getConfig().tickets.ai?.enabled && ai.isConfigured());
+  const intents = [
+    GatewayIntentBits.Guilds,
+    // Obligatoire pour détecter l'arrivée des nouveaux membres.
+    // À activer aussi sur le portail développeur : "SERVER MEMBERS INTENT".
+    GatewayIntentBits.GuildMembers,
+  ];
+  if (messageIntentsAtBoot) {
+    intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
+    console.log('🤖 IA des tickets activée : écoute des messages des tickets (modèle Mistral connecté).');
+  }
+  client = new Client({ intents });
 
   const readyEvent = Events.ClientReady || 'ready';
   client.once(readyEvent, async () => {
@@ -107,6 +117,16 @@ function createClient() {
     }
   });
 
+  // Messages dans les Salons de tickets -> assistante IA (Mistral)
+  client.on(Events.MessageCreate, async (message) => {
+    if (message.guildId !== GUILD_ID) return;
+    try {
+      await tickets.handleMessage(message);
+    } catch (err) {
+      console.warn('⚠️  IA des tickets :', err.message);
+    }
+  });
+
   client.on(Events.Error, (err) => console.error('❌ Erreur du bot discord :', err.message));
 
   return client;
@@ -151,6 +171,9 @@ async function startBot() {
     }
     if (/disallowed intents/i.test(err.message)) {
       console.error('    ➜ Va sur le portail développeur > ton application > Bot, et ACTIVE "SERVER MEMBERS INTENT".');
+      if (messageIntentsAtBoot) {
+        console.error('    ➜ Active AUSSI "MESSAGE CONTENT INTENT" (obligatoire pour l\'IA des tickets).');
+      }
     }
     console.error('    Le dashboard web reste accessible, mais le bot est hors ligne.');
     console.error('');
@@ -698,6 +721,24 @@ async function sendEmbedTemplate(index) {
   }
 }
 
+/**
+ * État de l'IA pour le dashboard : clé Mistral présente ou non, intents
+ * messages actifs au démarrage, et si un redémarrage est nécessaire
+ * (les intents discord ne peuvent pas changer sans relancer le bot).
+ */
+function getAiRuntime() {
+  const cfg = getConfig().tickets.ai;
+  const wantsIntents = Boolean(cfg?.enabled && ai.isConfigured());
+  return {
+    ...ai.status(),
+    enabledInConfig: Boolean(cfg?.enabled),
+    model: cfg?.model || ai.DEFAULT_MODEL,
+    intentsActive: messageIntentsAtBoot,
+    needsRestart: wantsIntents !== messageIntentsAtBoot,
+    ready: Boolean(cfg?.enabled && ai.isConfigured() && messageIntentsAtBoot && isReady),
+  };
+}
+
 module.exports = {
   startBot,
   getGuildInfo,
@@ -706,5 +747,6 @@ module.exports = {
   buildServerStructure,
   publishTicketPanel,
   sendEmbedTemplate,
+  getAiRuntime,
   GUILD_ID,
 };

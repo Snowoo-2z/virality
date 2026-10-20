@@ -57,6 +57,8 @@ function fillForm() {
   });
   syncChannelSelect();
   syncRoleSelect();
+  const triggerEl = $('#aiTriggerSelect');
+  if (triggerEl) triggerEl.value = config.tickets?.ai?.trigger || 'messages';
   updateConditionalSections();
 }
 
@@ -72,6 +74,33 @@ function collectForm() {
   if (document.getElementById('ticketStaffRoles')) {
     config.tickets.staffRoleIds = $$('#ticketStaffRoles input[type="checkbox"]:checked')
       .map((box) => box.value);
+  }
+
+  // Déclencheur de l'IA (liste simple)
+  const triggerEl = $('#aiTriggerSelect');
+  if (triggerEl && config.tickets?.ai) config.tickets.ai.trigger = triggerEl.value;
+
+  // Le type de ticket en cours d'édition (bouton sélectionné)
+  const type = selectedTicketType();
+  if (type && document.getElementById('ticketTypeForm')) {
+    const v = (id) => document.getElementById(id)?.value ?? '';
+    const c = (id) => Boolean(document.getElementById(id)?.checked);
+    type.name = v('tt_name');
+    type.id = v('tt_id');
+    type.buttonEmoji = v('tt_buttonEmoji');
+    type.buttonLabel = v('tt_buttonLabel');
+    type.buttonStyle = v('tt_buttonStyle') || 'Primary';
+    type.categoryId = v('tt_categoryIdManual').trim() || v('tt_categoryId');
+    type.categoryName = v('tt_categoryName');
+    type.namePattern = v('tt_namePattern');
+    type.askSubject = c('tt_askSubject');
+    type.pingStaff = c('tt_pingStaff');
+    type.aiEnabled = c('tt_aiEnabled');
+    type.aiPrompt = v('tt_aiPrompt');
+    const boxes = $$('#ticketTypeStaffRoles input[type="checkbox"]');
+    if (boxes.length) {
+      type.staffRoleIds = boxes.filter((b) => b.checked).map((b) => b.value);
+    }
   }
 }
 
@@ -249,24 +278,106 @@ function fillGenericSelects() {
 }
 
 /* ---------------- Tickets : rôles staff (cases à cocher) ---------------- */
-function buildTicketStaffRoles() {
-  const box = $('#ticketStaffRoles');
-  if (!box || !config) return;
+function ticketRolesSource() {
   const online = Boolean(guild?.online && guild?.onGuild && guild.roles?.length);
   // Bot hors ligne : on montre les rôles connus (ceux de l'onglet Rôles)
-  const source = online
+  const roles = online
     ? guild.roles
     : (config.rolesStyle || []).filter((r) => r.id).map((r) => ({ id: r.id, name: r.name, color: r.color }));
-  if (!source.length) {
-    box.innerHTML = '<p class="hint">Bot hors ligne : impossible de lister les rôles pour le moment.</p>';
-    return;
+  return { online, roles };
+}
+
+function staffChecksHtml(selectedIds) {
+  const { online, roles } = ticketRolesSource();
+  if (!roles.length) {
+    return '<p class="hint">Bot hors ligne : impossible de lister les rôles pour le moment.</p>';
   }
-  const selected = new Set(config.tickets.staffRoleIds || []);
-  box.innerHTML = '<div class="check-list">' + source.map((r) => {
+  const selected = new Set(selectedIds || []);
+  return '<div class="check-list">' + roles.map((r) => {
     const dot = /^#[0-9a-fA-F]{6}$/.test(r.color || '') && r.color !== '#000000' ? r.color : '#99aab5';
     return `<label class="check-chip"><input type="checkbox" value="${r.id}" ${selected.has(r.id) ? 'checked' : ''} /><span class="dotc" style="background:${dot}"></span>${escapeHtml(r.name)}</label>`;
   }).join('') + '</div>'
     + (online ? '' : '<p class="hint">Bot hors ligne : liste partielle (rôles connus). La liste complète du serveur arrivera quand le bot sera connecté.</p>');
+}
+
+function buildTicketStaffRoles() {
+  const box = $('#ticketStaffRoles');
+  if (!box || !config) return;
+  box.innerHTML = staffChecksHtml(config.tickets.staffRoleIds);
+}
+
+/* ------------- Tickets : types / boutons du panneau ------------- */
+let ticketTypeIndex = 0;
+
+function selectedTicketType() {
+  const types = config?.tickets?.types;
+  if (!Array.isArray(types) || !types.length) return null;
+  ticketTypeIndex = Math.min(Math.max(ticketTypeIndex, 0), types.length - 1);
+  return types[ticketTypeIndex];
+}
+
+function buildTicketTypeStaffRoles() {
+  const box = $('#ticketTypeStaffRoles');
+  const type = selectedTicketType();
+  if (!box || !config || !type) return;
+  box.innerHTML = staffChecksHtml(type.staffRoleIds);
+}
+
+function fillTicketTypeForm() {
+  const select = $('#ticketTypeSelect');
+  const type = selectedTicketType();
+  if (!select || !type) return;
+
+  select.innerHTML = config.tickets.types
+    .map((t, i) => `<option value="${i}">${escapeHtml(`${t.buttonEmoji ? t.buttonEmoji + ' ' : ''}${t.name || 'Sans nom'}`)}</option>`)
+    .join('');
+  select.value = String(ticketTypeIndex);
+  $('#deleteTicketTypeBtn').disabled = config.tickets.types.length <= 1;
+
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.value = value ?? ''; };
+  const setCheck = (id, value) => { const el = document.getElementById(id); if (el) el.checked = Boolean(value); };
+  set('tt_name', type.name);
+  set('tt_id', type.id);
+  set('tt_buttonEmoji', type.buttonEmoji);
+  set('tt_buttonLabel', type.buttonLabel);
+  set('tt_buttonStyle', type.buttonStyle || 'Primary');
+  set('tt_categoryName', type.categoryName);
+  set('tt_categoryIdManual', type.categoryId);
+  set('tt_namePattern', type.namePattern);
+  set('tt_aiPrompt', type.aiPrompt);
+  setCheck('tt_askSubject', type.askSubject);
+  setCheck('tt_pingStaff', type.pingStaff);
+  setCheck('tt_aiEnabled', type.aiEnabled);
+
+  // Liste des catégories propres au type
+  const catSelect = $('#tt_categoryId');
+  if (catSelect) {
+    const online = Boolean(guild?.online && guild?.onGuild);
+    catSelect.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = online ? '— Catégorie générale des tickets —' : '— Bot hors ligne : catégorie générale —';
+    catSelect.appendChild(ph);
+    for (const cat of guild?.categories || []) {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = cat.name;
+      catSelect.appendChild(opt);
+    }
+    catSelect.disabled = !online;
+    const current = String(type.categoryId || '');
+    if ([...catSelect.options].some((o) => o.value === current)) catSelect.value = current;
+  }
+
+  buildTicketTypeStaffRoles();
+}
+
+/** Recharge l'éditeur de type (et le formulaire du message d'ouverture, qui est par type). */
+function refreshTicketTypeEditor() {
+  fillTicketTypeForm();
+  buildTicketForms();
+  fillForm();
+  updateTicketPreview();
 }
 
 /* ----------- Fabrique de champs d'embed (réutilisée partout) ----------- */
@@ -319,7 +430,11 @@ function buildTicketForms() {
   }
   const open = $('#ticketOpenEmbedForm');
   if (open) {
-    open.innerHTML = embedInputsHtml('tickets.openEmbed', [
+    // Le message d'ouverture appartient au type sélectionné (un par bouton)
+    const openPrefix = selectedTicketType()
+      ? `tickets.types.${ticketTypeIndex}.openEmbed`
+      : 'tickets.openEmbed';
+    open.innerHTML = embedInputsHtml(openPrefix, [
       ['avatar', 'Avatar du membre'], ['logo', 'Logo Virality'], ['url', 'Image personnalisée (URL)'], ['aucune', 'Aucune'],
     ]);
   }
@@ -457,13 +572,19 @@ function updateTicketPreview() {
   if (!box || !config) return;
   const t = config.tickets;
   if (ticketPreviewTab === 'panel') {
-    const label = `${t.panelButtonEmoji ? t.panelButtonEmoji + ' ' : ''}${t.panelButtonLabel || 'Ouvrir un ticket'}`;
-    renderEmbedPreviewInto(box, t.panelEmbed, {
-      buttonHtml: `<span class="fake-button">${escapeHtml(label)}</span>`,
-    });
+    const styleClasses = { Primary: '', Secondary: ' secondary', Success: ' success', Danger: ' danger' };
+    const types = Array.isArray(t.types) && t.types.length ? t.types : null;
+    const buttonHtml = types
+      ? types.map((type) => {
+          const label = `${type.buttonEmoji ? type.buttonEmoji + ' ' : ''}${type.buttonLabel || type.name || 'Ouvrir un ticket'}`;
+          return `<span class="fake-button${styleClasses[type.buttonStyle] || ''}">${escapeHtml(label)}</span>`;
+        }).join('')
+      : `<span class="fake-button">${escapeHtml(`${t.panelButtonEmoji ? t.panelButtonEmoji + ' ' : ''}${t.panelButtonLabel || 'Ouvrir un ticket'}`)}</span>`;
+    renderEmbedPreviewInto(box, t.panelEmbed, { buttonHtml });
   } else {
-    renderEmbedPreviewInto(box, t.openEmbed, {
-      content: '{user}' + (t.pingStaff ? ' *(le staff est notifié)*' : ''),
+    const type = selectedTicketType();
+    renderEmbedPreviewInto(box, type?.openEmbed || t.openEmbed, {
+      content: '{user}' + ((type ? type.pingStaff : t.pingStaff) ? ' *(le staff est notifié)*' : ''),
       buttonHtml: '<span class="fake-button danger">🔒 Fermer le ticket</span>',
     });
   }
@@ -551,12 +672,42 @@ function renderSystemInfo(sys) {
     `<div class="system-line">${syncLine}</div>`;
 }
 
+function renderAiStatus(ai) {
+  const box = $('#aiStatusBox');
+  if (!box) return;
+  if (!ai) {
+    box.textContent = 'ℹ️ État de l\'IA indisponible pour le moment.';
+    return;
+  }
+  const lines = [];
+  if (!ai.enabledInConfig) {
+    lines.push(ai.configured
+      ? 'ℹ️ <b>IA désactivée</b> — ta clé Mistral est bien détectée, active l\'interrupteur ci-dessous quand tu es prêt.'
+      : 'ℹ️ <b>IA désactivée</b> — pour plus tard : colle ta clé dans le <code class="var">.env</code> (<code class="var">MISTRAL_API_KEY=...</code>), active <b>MESSAGE CONTENT INTENT</b> sur le portail développeur discord, puis redémarre le bot.');
+  } else if (!ai.configured) {
+    lines.push('❌ <b>Clé Mistral absente</b> — ajoute cette ligne dans ton fichier <code class="var">.env</code> (avec ta vraie clé de console.mistral.ai) puis redémarre le bot :');
+    lines.push('<pre class="env-snippet">MISTRAL_API_KEY=colle_ta_cle_mistral_ici</pre>');
+  } else if (ai.needsRestart) {
+    lines.push('⚠️ <b>Redémarre le bot</b> pour que l\'IA démarre (discord n\'autorise l\'écoute des messages qu\'au lancement). Pense aussi à cocher <b>MESSAGE CONTENT INTENT</b> sur le portail développeur → ton appli → <b>Bot</b>.');
+  } else if (ai.ready) {
+    lines.push(`✅ <b>IA en ligne</b> — modèle <code class="var">${escapeHtml(ai.model || '')}</code>, ${ai.requests || 0} réponse(s) depuis le démarrage.`);
+  } else {
+    lines.push('⚠️ <b>Clé et réglages OK</b>, mais le bot discord semble hors ligne : l\'IA répondra dès qu\'il sera connecté.');
+  }
+  if (ai.lastOkAt) lines.push(`✅ Dernière réponse IA réussie : ${new Date(ai.lastOkAt).toLocaleString('fr-FR')}`);
+  if (ai.lastError) lines.push(`❌ Dernière erreur Mistral : ${escapeHtml(ai.lastError)}`);
+  box.innerHTML = lines.map((l) => `<div class="system-line">${l}</div>`).join('');
+}
+
 async function loadSystem() {
   try {
-    renderSystemInfo(await api('/api/system'));
+    const sys = await api('/api/system');
+    renderSystemInfo(sys);
+    renderAiStatus(sys.ai);
   } catch {
     const box = $('#systemInfo');
     if (box) box.textContent = 'Infos de sauvegarde indisponibles pour le moment.';
+    renderAiStatus(null);
   }
 }
 
@@ -692,6 +843,7 @@ async function loadAll() {
   buildRoleRows();
   buildServerRows();
   buildTicketForms();
+  fillTicketTypeForm();
   buildEmbedBuilder();
   fillForm();
   fillGenericSelects();
@@ -711,6 +863,7 @@ async function loadGuild() {
   fillGuildSelects();
   markRoleStatuses();
   buildTicketStaffRoles();
+  fillTicketTypeForm();
 }
 
 /* ---------- Événements ---------- */
@@ -757,7 +910,7 @@ document.addEventListener('change', (e) => {
     collectForm();
     return;
   }
-  if (sel.closest?.('#ticketStaffRoles')) collectForm();
+  if (sel.closest?.('#ticketStaffRoles') || sel.closest?.('#ticketTypeStaffRoles')) collectForm();
 });
 
 $('#channelSelect').addEventListener('change', (e) => {
@@ -787,11 +940,13 @@ $('#saveBtn').addEventListener('click', async () => {
     const data = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
     config = data.config;
     fillForm();
+    fillTicketTypeForm();
     fillGenericSelects();
     updateRoleChips();
     updateTicketPreview();
     updateEmbedPreview();
     renderPreview();
+    loadSystem();
     showToast('✅ Configuration enregistrée ! Elle est déjà active sur le bot.');
   } catch (err) {
     showToast('❌ ' + err.message, true);
@@ -895,6 +1050,7 @@ $('#publishPanelBtn').addEventListener('click', async () => {
     const data = await api('/api/tickets/publish', { method: 'POST', body: '{}' });
     if (data.config) config = data.config;
     fillForm();
+    fillTicketTypeForm();
     fillGenericSelects();
     updateTicketPreview();
     showToast(data.updated
@@ -905,6 +1061,80 @@ $('#publishPanelBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = originalLabel;
+  }
+});
+
+/* ---------- Types de tickets (boutons) : sélection / création / suppression ---------- */
+$('#ticketTypeSelect').addEventListener('change', (e) => {
+  collectForm();
+  ticketTypeIndex = Number(e.target.value) || 0;
+  refreshTicketTypeEditor();
+});
+
+$('#newTicketTypeBtn').addEventListener('click', () => {
+  collectForm();
+  if (!Array.isArray(config.tickets.types)) config.tickets.types = [];
+  let n = config.tickets.types.length + 1;
+  const existing = new Set(config.tickets.types.map((t) => t.id));
+  while (existing.has(`type-${n}`)) n += 1;
+  const base = selectedTicketType();
+  const openEmbed = JSON.parse(JSON.stringify(base?.openEmbed || config.tickets.openEmbed || {}));
+  if (openEmbed.title) openEmbed.title = '🎫 Nouveau ticket';
+  config.tickets.types.push({
+    id: `type-${n}`,
+    name: 'Nouveau type',
+    buttonLabel: 'Nouveau ticket',
+    buttonEmoji: '🎫',
+    buttonStyle: 'Primary',
+    staffRoleIds: [...(config.tickets.staffRoleIds || [])],
+    pingStaff: true,
+    askSubject: true,
+    categoryId: '',
+    categoryName: '',
+    namePattern: 'ticket-{number}',
+    aiEnabled: true,
+    aiPrompt: '',
+    openEmbed,
+  });
+  ticketTypeIndex = config.tickets.types.length - 1;
+  refreshTicketTypeEditor();
+  showToast('➕ Nouveau bouton créé ! Personnalise-le, puis « 🚀 Publier le panneau » pour l\'afficher sur discord.');
+});
+
+$('#deleteTicketTypeBtn').addEventListener('click', () => {
+  if (!Array.isArray(config.tickets.types) || config.tickets.types.length <= 1) {
+    showToast('Il faut garder au moins un bouton sur le panneau 😉', true);
+    return;
+  }
+  collectForm();
+  const name = config.tickets.types[ticketTypeIndex]?.name || 'ce type';
+  config.tickets.types.splice(ticketTypeIndex, 1);
+  ticketTypeIndex = 0;
+  refreshTicketTypeEditor();
+  showToast(`🗑️ Bouton « ${name} » supprimé. Republie le panneau pour mettre discord à jour.`);
+});
+
+// Édition en direct des champs du type (nom du bouton dans la liste + aperçu)
+document.addEventListener('input', (e) => {
+  if (!config || !e.target.closest?.('#ticketTypeForm')) return;
+  collectForm();
+  if (e.target.id === 'tt_name' || e.target.id === 'tt_buttonEmoji') {
+    const opt = $('#ticketTypeSelect')?.options[ticketTypeIndex];
+    const type = selectedTicketType();
+    if (opt && type) opt.textContent = `${type.buttonEmoji ? type.buttonEmoji + ' ' : ''}${type.name || 'Sans nom'}`;
+  }
+  updateTicketPreview();
+});
+document.addEventListener('change', (e) => {
+  if (!config) return;
+  if (e.target.id === 'tt_categoryId') {
+    const manual = document.getElementById('tt_categoryIdManual');
+    if (manual) manual.value = e.target.value;
+    collectForm();
+  }
+  if (e.target.closest?.('#ticketTypeForm') || e.target.id === 'aiTriggerSelect') {
+    collectForm();
+    updateTicketPreview();
   }
 });
 

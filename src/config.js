@@ -51,6 +51,10 @@ const DEFAULTS = {
       roleId: '',
       delaySeconds: 0,
     },
+    // Donne automatiquement le rôle 🔥・Membre à chaque nouvel arrivant
+    // (rôle retrouvé via l'onglet Rôles, créé par le style 1 clic ou la
+    // construction du serveur). Indépendant du rôle automatique libre.
+    autoMemberRole: true,
   },
 
   /**
@@ -231,6 +235,149 @@ const DEFAULTS = {
       timestamp: true,
       fields: [],
     },
+
+    // Vrai une fois la config convertie au format "plusieurs boutons".
+    migratedTypes: true,
+
+    /**
+     * Assistante IA des tickets (Mistral). La clé API reste dans le .env
+     * (MISTRAL_API_KEY), jamais dans cette config. Le modèle par défaut
+     * correspond aux limites annoncées : 250 000 tokens/min, 1 req/s —
+     * le bot espace donc ses appels d'un peu plus d'1 seconde.
+     */
+    ai: {
+      enabled: false,
+      model: 'mistral-large-2512',
+      // 'messages' = répond aux messages du membre | 'mention' = seulement si @bot | 'accueil' = message IA à l'ouverture uniquement
+      trigger: 'messages',
+      greetOnOpen: true,
+      pauseWhenStaffReplies: true,
+      temperature: 0.7,
+      maxTokens: 450,
+      historyLimit: 12,
+      cooldownSeconds: 5,
+      systemPrompt:
+        'Tu es l\'assistante IA du support de Virality, une communauté discord autour du clipping vidéo (TikTok, YouTube Shorts, Reels) où les membres peuvent gagner de l\'argent grâce aux vues.\n' +
+        'Réponds en français, de façon chaleureuse, claire et concise (phrases courtes, quelques emojis max, jamais de pavé).\n' +
+        'Ton rôle : accueillir le membre, comprendre sa demande et lui poser les bonnes questions pour faire gagner du temps à l\'équipe humaine.\n' +
+        'Règles strictes : n\'invente jamais de prix, de délai ou de promesse ; ne demande jamais de mot de passe, de token ou de coordonnées bancaires ; si tu ne sais pas, dis simplement qu\'un membre de l\'équipe prend le relais très vite. Tu es une IA et tu peux le dire si on te le demande.',
+    },
+
+    /**
+     * Les boutons du panneau : un bouton = un type de ticket, avec ses
+     * rôles staff (accès + ping), son message d'ouverture et ses
+     * consignes IA propres. Modifiables/ajoutables dans le dashboard.
+     */
+    types: [
+      {
+        id: 'support',
+        name: 'Question / Support',
+        buttonLabel: 'Question / Support',
+        buttonEmoji: '❓',
+        buttonStyle: 'Primary',
+        staffRoleIds: [
+          '1562040635345735751', // Fondateur
+          '1562040762722553876', // Gérant Modération
+          '1562040845689946122', // modérateur
+          '1562040906603823124', // modérateur en Test
+        ],
+        pingStaff: true,
+        askSubject: true,
+        categoryId: '',
+        categoryName: '',
+        namePattern: 'ticket-{number}',
+        aiEnabled: true,
+        aiPrompt:
+          'Type de ticket : question générale ou problème. Aide le membre à décrire clairement son souci (quoi, depuis quand, sur quel salon/compte). Si c\'est une question simple sur le fonctionnement de la communauté, réponds brièvement ; sinon, récolte les infos utiles et rassure-le : l\'équipe arrive.',
+        openEmbed: {
+          title: '❓ Ticket Support ouvert',
+          description:
+            'Salut {user} 👋\n\nDécris ton souci ou ta question le plus clairement possible, ' +
+            'un membre de l\'équipe arrive très vite.\n\n' +
+            'Quand tout est réglé, clique sur **🔒 Fermer le ticket**.',
+          color: '#FF6A00',
+          footer: 'Virality • Ticket n°{number}',
+          author: '',
+          imageMode: 'aucune',
+          imageUrl: '',
+          thumbnail: 'avatar',
+          thumbnailUrl: '',
+          timestamp: true,
+          fields: [],
+        },
+      },
+      {
+        id: 'commande',
+        name: 'Commande de clip',
+        buttonLabel: 'Commander un clip',
+        buttonEmoji: '🎬',
+        buttonStyle: 'Success',
+        staffRoleIds: [
+          '1562040635345735751', // Fondateur
+          '1562040762722553876', // Gérant Modération
+          '1562040845689946122', // modérateur
+        ],
+        pingStaff: true,
+        askSubject: true,
+        categoryId: '',
+        categoryName: '',
+        namePattern: 'commande-{number}',
+        aiEnabled: true,
+        aiPrompt:
+          'Type de ticket : commande de clip vidéo. Ton but est de récolter un brief complet pour les clippers : lien de la vidéo ou du live à clipper, moment précis (timestamps), style souhaité (texte à l\'écran, musique, format), plateformes visées (TikTok, Shorts, Reels) et délai espéré. Pose ces questions une par une, gentiment, puis récapitule le brief en liste courte quand le membre a tout donné. Ne donne aucun prix ni délai garanti : l\'équipe confirmera.',
+        openEmbed: {
+          title: '🎬 Commande de clip',
+          description:
+            'Salut {user} 👋 Prêt à devenir viral ? 🔥\n\nPour que nos clippers te fassent un clip au top, donne-nous :\n' +
+            '• le **lien** de la vidéo / du live\n• le **moment** à clipper (timestamps)\n• le **style** souhaité\n\n' +
+            'On s\'occupe du reste ! Quand tout est réglé, clique sur **🔒 Fermer le ticket**.',
+          color: '#FF7B1C',
+          footer: 'Virality • Commande n°{number}',
+          author: '',
+          imageMode: 'aucune',
+          imageUrl: '',
+          thumbnail: 'avatar',
+          thumbnailUrl: '',
+          timestamp: true,
+          fields: [],
+        },
+      },
+      {
+        id: 'partenariat',
+        name: 'Partenariat / Business',
+        buttonLabel: 'Partenariat',
+        buttonEmoji: '🤝',
+        buttonStyle: 'Secondary',
+        staffRoleIds: [
+          '1562040635345735751', // Fondateur
+          '1562040762722553876', // Gérant Modération
+        ],
+        pingStaff: true,
+        askSubject: true,
+        categoryId: '',
+        categoryName: '',
+        namePattern: 'partenariat-{number}',
+        aiEnabled: true,
+        aiPrompt:
+          'Type de ticket : partenariat ou proposition business. Reste très professionnelle. Demande poliment : qui ils sont (marque, créateur...), leurs réseaux et chiffres clés (abonnés, vues), ce qu\'ils proposent concrètement et ce qu\'ils attendent de Virality. Ne t\'engage sur rien : explique que la direction étudie chaque proposition et reviendra vers eux ici même.',
+        openEmbed: {
+          title: '🤝 Partenariat / Business',
+          description:
+            'Bonjour {user}, merci de votre intérêt pour **Virality** 🤝\n\nPrésentez-vous en quelques lignes : ' +
+            'votre marque ou chaîne, vos chiffres clés, et la collaboration que vous imaginez.\n\n' +
+            'La direction étudie chaque proposition et vous répondra ici même.',
+          color: '#FFB020',
+          footer: 'Virality • Partenariat n°{number}',
+          author: '',
+          imageMode: 'aucune',
+          imageUrl: '',
+          thumbnail: 'avatar',
+          thumbnailUrl: '',
+          timestamp: true,
+          fields: [],
+        },
+      },
+    ],
   },
 
   /**
@@ -382,6 +529,109 @@ function normalizeGenericEmbed(embed, defaults) {
   };
 }
 
+function normalizeRoleIdList(value, fallback) {
+  return Array.isArray(value)
+    ? [...new Set(value.map((x) => String(x).trim()).filter(Boolean))].slice(0, 25)
+    : [...fallback];
+}
+
+function sanitizeTicketTypeId(value, fallback) {
+  const clean = String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return clean || fallback;
+}
+
+function normalizeTicketAi(input) {
+  const def = DEFAULTS.tickets.ai;
+  const a = input && typeof input === 'object' ? input : {};
+  const intInRange = (v, min, max, fallback) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback;
+  };
+  const temp = Number(a.temperature);
+  return {
+    enabled: Boolean(a.enabled ?? def.enabled),
+    model: String(a.model ?? def.model).trim().slice(0, 80) || def.model,
+    trigger: ['messages', 'mention', 'accueil'].includes(a.trigger) ? a.trigger : def.trigger,
+    greetOnOpen: Boolean(a.greetOnOpen ?? def.greetOnOpen),
+    pauseWhenStaffReplies: Boolean(a.pauseWhenStaffReplies ?? def.pauseWhenStaffReplies),
+    temperature: Number.isFinite(temp) ? Math.min(1.5, Math.max(0, temp)) : def.temperature,
+    maxTokens: intInRange(a.maxTokens, 50, 2000, def.maxTokens),
+    historyLimit: intInRange(a.historyLimit, 2, 30, def.historyLimit),
+    cooldownSeconds: intInRange(a.cooldownSeconds, 1, 120, def.cooldownSeconds),
+    systemPrompt: String(a.systemPrompt ?? def.systemPrompt).slice(0, 4000) || def.systemPrompt,
+  };
+}
+
+function normalizeTicketType(raw, fallback, index) {
+  const t = raw && typeof raw === 'object' ? raw : {};
+  const def = fallback || DEFAULTS.tickets.types[0];
+  return {
+    id: sanitizeTicketTypeId(t.id, def.id || `type-${index + 1}`),
+    name: String(t.name ?? def.name).trim().slice(0, 80) || def.name,
+    buttonLabel: String(t.buttonLabel ?? def.buttonLabel).trim().slice(0, 80) || def.buttonLabel,
+    buttonEmoji: String(t.buttonEmoji ?? def.buttonEmoji).trim().slice(0, 16),
+    buttonStyle: ['Primary', 'Secondary', 'Success', 'Danger'].includes(t.buttonStyle)
+      ? t.buttonStyle
+      : def.buttonStyle,
+    staffRoleIds: normalizeRoleIdList(t.staffRoleIds, def.staffRoleIds || []),
+    pingStaff: Boolean(t.pingStaff ?? def.pingStaff),
+    askSubject: Boolean(t.askSubject ?? def.askSubject),
+    categoryId: String(t.categoryId ?? '').trim(),
+    categoryName: String(t.categoryName ?? def.categoryName ?? '').trim().slice(0, 100),
+    namePattern: String(t.namePattern ?? def.namePattern).trim().slice(0, 60) || def.namePattern,
+    aiEnabled: Boolean(t.aiEnabled ?? def.aiEnabled ?? true),
+    aiPrompt: String(t.aiPrompt ?? def.aiPrompt ?? '').slice(0, 3000),
+    openEmbed: normalizeGenericEmbed(t.openEmbed, def.openEmbed || DEFAULTS.tickets.openEmbed),
+  };
+}
+
+function normalizeTicketTypes(t) {
+  const defTypes = DEFAULTS.tickets.types;
+  let rawTypes;
+
+  if (Array.isArray(t.types) && t.types.length) {
+    rawTypes = t.types;
+  } else {
+    // Ancienne config (un seul bouton) : on la convertit en premier type
+    // pour ne perdre aucun réglage, puis on ajoute les types suggérés.
+    const legacy = {
+      id: 'support',
+      name: 'Question / Support',
+      buttonLabel: t.panelButtonLabel || 'Question / Support',
+      buttonEmoji: t.panelButtonEmoji ?? '❓',
+      buttonStyle: 'Primary',
+      staffRoleIds: t.staffRoleIds,
+      pingStaff: t.pingStaff,
+      askSubject: t.askSubject,
+      categoryId: t.categoryId,
+      categoryName: t.categoryName,
+      namePattern: t.namePattern,
+      aiEnabled: true,
+      aiPrompt: defTypes[0].aiPrompt,
+      openEmbed: t.openEmbed,
+    };
+    rawTypes = [legacy, ...defTypes.slice(1)];
+  }
+
+  const seen = new Set();
+  return rawTypes.slice(0, 10).map((raw, i) => {
+    const fallback = defTypes.find((d) => d.id === raw?.id) || defTypes[0];
+    const type = normalizeTicketType(raw, fallback, i);
+    let uniqueId = type.id;
+    let n = 2;
+    while (seen.has(uniqueId)) uniqueId = `${type.id}-${n++}`;
+    seen.add(uniqueId);
+    type.id = uniqueId;
+    return type;
+  });
+}
+
 function normalizeTickets(input) {
   const def = DEFAULTS.tickets;
   const t = input && typeof input === 'object' ? input : {};
@@ -395,9 +645,7 @@ function normalizeTickets(input) {
     panelMessageId: String(t.panelMessageId ?? '').trim(),
     categoryId: String(t.categoryId ?? '').trim(),
     categoryName: String(t.categoryName ?? def.categoryName).trim().slice(0, 100) || def.categoryName,
-    staffRoleIds: Array.isArray(t.staffRoleIds)
-      ? [...new Set(t.staffRoleIds.map((x) => String(x).trim()).filter(Boolean))].slice(0, 25)
-      : [...def.staffRoleIds],
+    staffRoleIds: normalizeRoleIdList(t.staffRoleIds, def.staffRoleIds),
     maxPerUser: intInRange(t.maxPerUser, 1, 10, def.maxPerUser),
     namePattern: String(t.namePattern ?? def.namePattern).trim().slice(0, 60) || def.namePattern,
     counter: intInRange(t.counter, 0, 999999, 0),
@@ -410,6 +658,9 @@ function normalizeTickets(input) {
     panelButtonEmoji: String(t.panelButtonEmoji ?? def.panelButtonEmoji).trim().slice(0, 16),
     panelEmbed: normalizeGenericEmbed(t.panelEmbed, def.panelEmbed),
     openEmbed: normalizeGenericEmbed(t.openEmbed, def.openEmbed),
+    migratedTypes: true,
+    ai: normalizeTicketAi(t.ai),
+    types: normalizeTicketTypes(t),
   };
 }
 
@@ -447,6 +698,7 @@ function normalizeConfig(input) {
   w.dm.texteMessage = String(w.dm.texteMessage || '').slice(0, 2000);
   w.dm.embed = normalizeEmbedSection(w.dm.embed, DEFAULTS.welcome.dm.embed);
 
+  w.autoMemberRole = Boolean(w.autoMemberRole ?? DEFAULTS.welcome.autoMemberRole);
   w.autoRole.enabled = Boolean(w.autoRole.enabled);
   w.autoRole.roleId = String(w.autoRole.roleId || '').trim();
   const delay = Number(w.autoRole.delaySeconds);
@@ -456,7 +708,11 @@ function normalizeConfig(input) {
 
   merged.rolesStyle = normalizeRolesStyle(merged.rolesStyle);
   merged.serverStructure = normalizeServerStructure(merged.serverStructure);
-  merged.tickets = normalizeTickets(merged.tickets);
+  // Tickets : on valide depuis l'entrée brute pour détecter les anciennes
+  // configs (un seul bouton) et les migrer sans perdre leurs réglages.
+  merged.tickets = normalizeTickets(
+    input && typeof input === 'object' ? input.tickets : undefined
+  );
   merged.embeds = normalizeEmbeds(merged.embeds);
   return merged;
 }

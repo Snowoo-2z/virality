@@ -144,23 +144,73 @@ async function sendWelcome(member, { test = false } = {}) {
   return { ok: true };
 }
 
-/** Donne le rôle automatique au nouveau membre (avec délai éventuel). */
+/** "🔥・Membre" -> "membre" (pour retrouver un rôle malgré emoji/accents). */
+function simplifyRoleName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z]/g, '');
+}
+
+/** Retrouve le rôle Membre : par l'ID mémorisé (onglet Rôles), sinon par nom. */
+async function resolveMemberRole(guild) {
+  const entry = getConfig().rolesStyle?.find((r) => r.key === 'membre');
+  if (entry?.id) {
+    const byId = guild.roles.cache.get(entry.id)
+      || (await guild.roles.fetch(entry.id).catch(() => null));
+    if (byId) return byId;
+  }
+  const wanted = entry?.name ? simplifyRoleName(entry.name) : 'membre';
+  return guild.roles.cache.find(
+    (r) => r.id !== guild.id && !r.managed && simplifyRoleName(r.name) === wanted
+  ) || null;
+}
+
+/**
+ * Donne les rôles d'arrivée au nouveau membre (avec délai éventuel) :
+ * - le rôle 🔥・Membre si l'option est activée (par défaut),
+ * - le rôle automatique libre choisi dans le dashboard, si activé.
+ */
 function applyAutoRole(member) {
-  const auto = getConfig().welcome.autoRole;
-  if (!auto.enabled || !auto.roleId) return;
+  const welcome = getConfig().welcome;
+  const auto = welcome.autoRole;
+  const wantGeneric = Boolean(auto.enabled && auto.roleId);
+  const wantMember = Boolean(welcome.autoMemberRole);
+  if (!wantGeneric && !wantMember) return;
 
   const give = async () => {
     try {
-      const role = member.guild.roles.cache.get(auto.roleId)
-        || (await member.guild.roles.fetch(auto.roleId).catch(() => null));
-      if (!role) {
-        console.log('⚠️  Rôle automatique introuvable (ID incorrect dans la config ?).');
-        return;
+      const roles = [];
+      const seen = new Set();
+      const pushRole = (role) => {
+        if (role && !seen.has(role.id)) {
+          seen.add(role.id);
+          roles.push(role);
+        }
+      };
+
+      if (wantMember) {
+        const memberRole = await resolveMemberRole(member.guild);
+        if (memberRole) pushRole(memberRole);
+        else console.log('⚠️  Rôle Membre introuvable : crée-le via l\'onglet Rôles (bouton style) ou la construction du serveur.');
       }
-      await member.roles.add(role, 'Rôle automatique de bienvenue');
+
+      if (wantGeneric) {
+        const role = member.guild.roles.cache.get(auto.roleId)
+          || (await member.guild.roles.fetch(auto.roleId).catch(() => null));
+        if (role) pushRole(role);
+        else console.log('⚠️  Rôle automatique introuvable (ID incorrect dans la config ?).');
+      }
+
+      for (const role of roles) {
+        if (member.roles.cache.has(role.id)) continue;
+        await member.roles.add(role, 'Rôle donné automatiquement à l\'arrivée');
+        console.log(`🏷️  Rôle ${role.name} donné à ${member.user.tag}`);
+      }
     } catch (err) {
       console.error(
-        '❌ Rôle automatique non attribué :', err.message,
+        '❌ Rôle d\'arrivée non attribué :', err.message,
         '\n   Astuce : dans les paramètres du serveur > Rôles, glisse le rôle du bot AU-DESSUS du rôle à donner.'
       );
     }

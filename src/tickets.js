@@ -27,11 +27,19 @@ const {
 } = require('discord.js');
 const { getConfig, saveConfig } = require('./config');
 const { buildEmbedPayload } = require('./embeds');
+const ai = require('./ai');
 
-const OPEN_BUTTON_ID = 'ticket:open';
+const OPEN_BUTTON_ID = 'ticket:open'; // anciens panneaux : 'ticket:open' | nouveaux : 'ticket:open:<typeId>'
 const CLOSE_BUTTON_ID = 'ticket:close';
-const MODAL_ID = 'ticket:modal:create';
+const MODAL_ID = 'ticket:modal:create'; // + ':<typeId>' pour les nouveaux panneaux
 const ORANGE = 0xff6a00;
+
+const BUTTON_STYLES = {
+  Primary: ButtonStyle.Primary,
+  Secondary: ButtonStyle.Secondary,
+  Success: ButtonStyle.Success,
+  Danger: ButtonStyle.Danger,
+};
 
 /* ------------------------------ Utilitaires ------------------------------ */
 
@@ -56,8 +64,11 @@ function sanitizeChannelName(raw) {
   return clean || 'ticket';
 }
 
-function ticketChannelName(cfg, member, number) {
-  const raw = String(cfg.namePattern || 'ticket-{number}')
+function ticketChannelName(patternOrCfg, member, number) {
+  const pattern = typeof patternOrCfg === 'string'
+    ? patternOrCfg
+    : patternOrCfg?.namePattern;
+  const raw = String(pattern || 'ticket-{number}')
     .replaceAll('{number}', String(number).padStart(3, '0'))
     .replaceAll('{user}', member?.user?.username ?? 'membre');
   return sanitizeChannelName(raw);
@@ -67,8 +78,9 @@ function parseTicketTopic(topic) {
   if (!topic || !topic.includes('virality-ticket')) return null;
   const owner = topic.match(/owner:(\d{5,})/)?.[1] || null;
   const number = topic.match(/n°(\d+)/)?.[1] || null;
+  const type = topic.match(/type:([a-z0-9_-]+)/i)?.[1] || null;
   const subject = topic.match(/Sujet:\s*(.+)$/)?.[1]?.trim() || '';
-  return owner ? { ownerId: owner, number, subject } : null;
+  return owner ? { ownerId: owner, number, type, subject } : null;
 }
 
 function findUserTickets(guild, userId) {
@@ -77,10 +89,27 @@ function findUserTickets(guild, userId) {
   );
 }
 
-function staffRolesOf(guild, cfg) {
-  return (cfg.staffRoleIds || [])
+function staffRolesOf(guild, roleIdsOrCfg) {
+  const ids = Array.isArray(roleIdsOrCfg) ? roleIdsOrCfg : roleIdsOrCfg?.staffRoleIds || [];
+  return ids
     .map((id) => guild.roles.cache.get(id))
     .filter(Boolean);
+}
+
+/** Les types de tickets configurés (toujours au moins un, voir config.js). */
+function ticketTypes(cfg) {
+  return Array.isArray(cfg.types) && cfg.types.length ? cfg.types : [];
+}
+
+/** Retrouve un type par son id, sinon le premier type (anciens tickets). */
+function typeByKey(cfg, key) {
+  const types = ticketTypes(cfg);
+  return types.find((t) => t.id === key) || types[0] || null;
+}
+
+/** Rôles staff d'un type (repli sur les rôles staff globaux si vide). */
+function typeStaffRoleIds(cfg, type) {
+  return type?.staffRoleIds?.length ? type.staffRoleIds : cfg.staffRoleIds || [];
 }
 
 function memberAvatar(member) {
@@ -102,7 +131,7 @@ function ctxFor(member, extra = {}) {
   };
 }
 
-function baseOverwrites(guild, me, cfg, ownerId = null) {
+function baseOverwrites(guild, me, staffRoleIds, ownerId = null) {
   const F = PermissionFlagsBits;
   const ows = [
     { id: guild.id, deny: [F.ViewChannel] },
@@ -113,7 +142,7 @@ function baseOverwrites(guild, me, cfg, ownerId = null) {
         F.ManageMessages, F.ManageChannels, F.EmbedLinks, F.AttachFiles,
       ],
     },
-    ...staffRolesOf(guild, cfg).map((r) => ({
+    ...staffRolesOf(guild, staffRoleIds).map((r) => ({
       id: r.id,
       allow: [F.ViewChannel, F.SendMessages, F.ReadMessageHistory, F.ManageMessages, F.EmbedLinks, F.AttachFiles],
     })),
@@ -130,14 +159,27 @@ function baseOverwrites(guild, me, cfg, ownerId = null) {
 /* ------------------------------ Panneau ------------------------------ */
 
 function panelComponents(cfg) {
-  const button = new ButtonBuilder()
-    .setCustomId(OPEN_BUTTON_ID)
-    .setLabel(cfg.panelButtonLabel || 'Ouvrir un ticket')
-    .setStyle(ButtonStyle.Primary);
-  if (cfg.panelButtonEmoji) {
-    try { button.setEmoji(cfg.panelButtonEmoji); } catch { /* emoji invalide : bouton sans emoji */ }
+  const types = ticketTypes(cfg);
+  const buttons = (types.length ? types : [null]).map((type) => {
+    const button = new ButtonBuilder()
+      .setCustomId(type ? `${OPEN_BUTTON_ID}:${type.id}` : OPEN_BUTTON_ID)
+      .setLabel((type?.buttonLabel || type?.name || cfg.panelButtonLabel || 'Ouvrir un ticket').slice(0, 80))
+      .setStyle(BUTTON_STYLES[type?.buttonStyle] ?? ButtonStyle.Primary);
+    const emoji = type?.buttonEmoji ?? cfg.panelButtonEmoji;
+    if (emoji) {
+      try { button.setEmoji(emoji); } catch { /* emoji invalide : bouton sans emoji */ }
+    }
+    return button;
+  });
+
+  // discord : 5 rangées max, 5 boutons par rangée. Un bouton par rangée
+  // reste le plus lisible jusqu'à 5 types ; au-delà on les range par 5.
+  const perRow = buttons.length <= 5 ? 1 : 5;
+  const rows = [];
+  for (let i = 0; i < buttons.length && rows.length < 5; i += perRow) {
+    rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + perRow)));
   }
-  return [new ActionRowBuilder().addComponents(button)];
+  return rows;
 }
 
 /** Publie (ou met à jour) le panneau de tickets dans le salon configuré. */
@@ -183,33 +225,41 @@ async function publishPanel(guild) {
 
 /* --------------------------- Création de ticket --------------------------- */
 
-async function resolveCategory(guild, me, cfg) {
-  let category = cfg.categoryId ? guild.channels.cache.get(cfg.categoryId) : null;
+async function resolveCategory(guild, me, cfg, type) {
+  // Le type peut avoir sa propre catégorie ; sinon celle des réglages généraux.
+  const holder = type && (type.categoryId || type.categoryName) ? type : cfg;
+  const wantedName = holder.categoryName || cfg.categoryName;
+
+  let category = holder.categoryId ? guild.channels.cache.get(holder.categoryId) : null;
   if (category && category.type !== ChannelType.GuildCategory) category = null;
   if (!category) {
     category = guild.channels.cache.find(
-      (c) => c.type === ChannelType.GuildCategory && simplify(c.name) === simplify(cfg.categoryName)
+      (c) => c.type === ChannelType.GuildCategory && simplify(c.name) === simplify(wantedName)
     ) || null;
   }
   if (!category) {
+    // Permissions de la catégorie : staff du type + staff global (les Salons
+    // de tickets ont de toute façon leurs propres permissions explicites).
+    const unionStaff = [...new Set([...(cfg.staffRoleIds || []), ...typeStaffRoleIds(cfg, type)])];
     category = await guild.channels.create({
-      name: cfg.categoryName,
+      name: wantedName,
       type: ChannelType.GuildCategory,
-      permissionOverwrites: baseOverwrites(guild, me, cfg),
+      permissionOverwrites: baseOverwrites(guild, me, unionStaff),
       reason: 'Catégorie des tickets Virality',
     });
   }
-  if (cfg.categoryId !== category.id) {
-    cfg.categoryId = category.id;
+  if (holder.categoryId !== category.id) {
+    holder.categoryId = category.id; // cfg/type = références dans la config en mémoire
     saveConfig();
   }
   return category;
 }
 
-async function createTicket(interaction, subject) {
+async function createTicket(interaction, subject, typeKey) {
   const guild = interaction.guild;
   const member = interaction.member;
   const cfg = getConfig().tickets;
+  const type = typeByKey(cfg, typeKey);
   const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
   if (!me) throw new Error('Impossible de récupérer le membre du bot.');
 
@@ -223,25 +273,26 @@ async function createTicket(interaction, subject) {
     return;
   }
 
-  const category = await resolveCategory(guild, me, cfg);
+  const staffIds = staffRolesOf(guild, typeStaffRoleIds(cfg, type)).map((r) => r.id);
+  const category = await resolveCategory(guild, me, cfg, type);
   const number = (Number(cfg.counter) || 0) + 1;
-  const topic = `virality-ticket • owner:${member.id} • n°${number}${subject ? ` • Sujet: ${subject}` : ''}`.slice(0, 1024);
+  const topic = `virality-ticket • owner:${member.id} • n°${number}${type ? ` • type:${type.id}` : ''}${subject ? ` • Sujet: ${subject}` : ''}`.slice(0, 1024);
 
   const channel = await guild.channels.create({
-    name: ticketChannelName(cfg, member, number),
+    name: ticketChannelName(type?.namePattern || cfg.namePattern, member, number),
     type: ChannelType.GuildText,
     parent: category.id,
     topic,
-    permissionOverwrites: baseOverwrites(guild, me, cfg, member.id),
-    reason: `Ticket ouvert par ${member.user.tag}`,
+    permissionOverwrites: baseOverwrites(guild, me, staffIds, member.id),
+    reason: `Ticket ouvert par ${member.user.tag}${type ? ` (${type.name})` : ''}`,
   });
 
   cfg.counter = number;
   saveConfig();
 
-  // Message d'accueil dans le ticket
+  // Message d'accueil dans le ticket (propre au type cliqué)
   const ctx = ctxFor(member, { number, subject: subject || '' });
-  const payload = buildEmbedPayload(cfg.openEmbed, ctx, {
+  const payload = buildEmbedPayload(type?.openEmbed || cfg.openEmbed, ctx, {
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(CLOSE_BUTTON_ID)
@@ -255,16 +306,20 @@ async function createTicket(interaction, subject) {
     payload.embeds[0].addFields({ name: '📝 Sujet', value: subject.slice(0, 1024) });
   }
 
-  const staffIds = staffRolesOf(guild, cfg).map((r) => r.id);
+  const shouldPingStaff = type ? type.pingStaff : cfg.pingStaff;
   const pings = [`<@${member.id}>`];
-  if (cfg.pingStaff) pings.push(...staffIds.map((id) => `<@&${id}>`));
+  if (shouldPingStaff) pings.push(...staffIds.map((id) => `<@&${id}>`));
   payload.content = pings.join(' ');
-  payload.allowedMentions = { users: [member.id], roles: cfg.pingStaff ? staffIds : [] };
+  payload.allowedMentions = { users: [member.id], roles: shouldPingStaff ? staffIds : [] };
 
   await channel.send(payload);
   await interaction.editReply({
     content: `✅ Ton ticket est ouvert : ${channel} — clique pour y aller !`,
   });
+
+  // Premier message de l'IA (si activée) : en arrière-plan, sans bloquer l'ouverture
+  maybeAiGreeting(channel, member, { number, subject: subject || '', type })
+    .catch((err) => console.warn('⚠️  Accueil IA du ticket échoué :', err.message));
 }
 
 /* --------------------------- Fermeture + transcription --------------------------- */
@@ -316,9 +371,9 @@ async function closeTicket(interaction) {
   }
 
   const member = interaction.member;
+  const type = typeByKey(cfg, meta.type);
   const isOwner = interaction.user.id === meta.ownerId;
-  const isStaff = member.roles.cache.some((r) => cfg.staffRoleIds.includes(r.id))
-    || member.permissions.has(PermissionFlagsBits.Administrator);
+  const isStaff = isStaffMember(member, cfg, type);
   if (!isOwner && !isStaff) {
     return interaction.reply({
       content: '⛔ Seuls le créateur du ticket et l\'équipe peuvent le fermer.',
@@ -391,13 +446,176 @@ async function closeTicket(interaction) {
   }, delay * 1000);
 }
 
+/* ------------------------------ Assistante IA ------------------------------ */
+
+const staffIntervenedChannels = new Set(); // Salons où un humain du staff a déjà répondu
+const aiInFlightChannels = new Set(); // Réponse IA déjà en cours dans ce salon
+const aiLastReplyAt = new Map(); // Dernier envoi IA par salon (anti-spam)
+const aiErrorNotifiedChannels = new Set(); // Panne IA déjà signalée dans ce salon
+
+function isStaffMember(member, cfg, type) {
+  if (!member) return false;
+  if (member.permissions?.has(PermissionFlagsBits.Administrator)) return true;
+  const ids = new Set([...(cfg.staffRoleIds || []), ...typeStaffRoleIds(cfg, type)]);
+  return member.roles.cache.some((r) => ids.has(r.id));
+}
+
+function aiSystemPrompt(cfg, type, meta = {}) {
+  const parts = [cfg.ai.systemPrompt];
+  if (type?.aiPrompt) {
+    parts.push(`Consignes spécifiques à ce type de ticket (« ${type.name} ») :\n${type.aiPrompt}`);
+  }
+  const context = [
+    type ? `Type de ticket : ${type.name}.` : null,
+    meta.number ? `Ticket n°${meta.number}.` : null,
+    meta.subject ? `Sujet annoncé par le membre : ${meta.subject}.` : null,
+  ].filter(Boolean).join(' ');
+  if (context) parts.push(`Contexte : ${context}`);
+  return parts.filter(Boolean).join('\n\n');
+}
+
+/** Convertit l'Historique discord en messages pour Mistral (testable). */
+function buildAiMessages({ cfg, type, meta, messages, botId }) {
+  const history = (messages || [])
+    .filter((m) => (m.content || '').trim())
+    .slice(-(cfg.ai.historyLimit || 12))
+    .map((m) => {
+      const content = m.content.trim().slice(0, 1500);
+      if (m.author?.id === botId) return { role: 'assistant', content };
+      if (m.author?.id === meta.ownerId) return { role: 'user', content };
+      return { role: 'user', content: `[Membre de l'équipe ${m.author?.tag || ''}] ${content}` };
+    });
+  return [{ role: 'system', content: aiSystemPrompt(cfg, type, meta) }, ...history];
+}
+
+async function sendAiText(channel, text) {
+  for (const chunk of ai.splitForDiscord(text)) {
+    await channel.send({ content: chunk, allowedMentions: { parse: [] } });
+  }
+}
+
+function aiUsable(cfg, type) {
+  return Boolean(cfg.ai?.enabled && type && type.aiEnabled !== false && ai.isConfigured());
+}
+
+/** Premier message de l'IA à l'ouverture du ticket (si activé). */
+async function maybeAiGreeting(channel, member, { number, subject, type }) {
+  const cfg = getConfig().tickets;
+  if (!aiUsable(cfg, type)) return;
+  if (!cfg.ai.greetOnOpen && cfg.ai.trigger !== 'accueil') return;
+
+  await channel.sendTyping().catch(() => {});
+  const text = await ai.chat({
+    model: cfg.ai.model,
+    temperature: cfg.ai.temperature,
+    maxTokens: cfg.ai.maxTokens,
+    messages: [
+      { role: 'system', content: aiSystemPrompt(cfg, type, { number, subject }) },
+      {
+        role: 'user',
+        content:
+          `Un membre nommé ${member.user.username} vient d'ouvrir un ticket « ${type.name} ».` +
+          (subject ? ` Sujet annoncé : « ${subject} ».` : ' Il n\'a pas encore précisé de sujet.') +
+          ' Écris ton tout premier message dans ce ticket : accueille-le chaleureusement en 2-3 phrases et pose-lui LA question la plus utile pour avancer (ou demande-lui de décrire sa demande si le sujet est vide).',
+      },
+    ],
+  });
+  await sendAiText(channel, text);
+  aiLastReplyAt.set(channel.id, Date.now());
+}
+
+/**
+ * À appeler pour chaque message reçu : l'IA répond dans les Salons de
+ * tickets selon ses réglages (déclencheur, pause si le staff répond...).
+ * Nécessite l'intent MESSAGE CONTENT (activé au démarrage si l'IA est on).
+ */
+async function handleMessage(message) {
+  if (!message?.guild || message.author?.bot) return;
+  const content = (message.content || '').trim();
+  if (!content) return;
+
+  const meta = parseTicketTopic(message.channel?.topic);
+  if (!meta) return;
+
+  const cfg = getConfig().tickets;
+  if (!cfg.enabled || !cfg.ai?.enabled) return;
+  const type = typeByKey(cfg, meta.type);
+  if (!aiUsable(cfg, type)) return;
+
+  const isOwner = message.author.id === meta.ownerId;
+  const staff = isStaffMember(message.member, cfg, type);
+  const mentioned = Boolean(message.mentions?.users?.has(message.client.user.id));
+
+  if (staff && !isOwner) {
+    staffIntervenedChannels.add(message.channel.id);
+    if (!mentioned) return; // le staff gère, l'IA se tait (sauf si on l'appelle)
+  } else if (!isOwner) {
+    return;
+  }
+
+  if (cfg.ai.trigger === 'accueil') return;
+  if (cfg.ai.trigger === 'mention' && !mentioned) return;
+  if (cfg.ai.pauseWhenStaffReplies && staffIntervenedChannels.has(message.channel.id) && !mentioned) return;
+
+  const channelId = message.channel.id;
+  if (aiInFlightChannels.has(channelId)) return;
+  const cooldownMs = Math.max(1, Number(cfg.ai.cooldownSeconds) || 5) * 1000;
+  if (Date.now() - (aiLastReplyAt.get(channelId) || 0) < cooldownMs) return;
+
+  aiInFlightChannels.add(channelId);
+  aiLastReplyAt.set(channelId, Date.now());
+  try {
+    await message.channel.sendTyping().catch(() => {});
+    const fetched = await message.channel.messages
+      .fetch({ limit: Math.max(10, cfg.ai.historyLimit || 12) })
+      .catch(() => null);
+    const history = fetched
+      ? [...fetched.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+      : [message];
+
+    // Pause « staff » retrouvée même après un redémarrage du bot :
+    // un humain autre que le créateur a déjà écrit dans ce ticket.
+    if (cfg.ai.pauseWhenStaffReplies && !mentioned
+      && history.some((m) => m.id !== message.id && !m.author.bot && m.author.id !== meta.ownerId)) {
+      staffIntervenedChannels.add(channelId);
+      return;
+    }
+
+    const text = await ai.chat({
+      model: cfg.ai.model,
+      temperature: cfg.ai.temperature,
+      maxTokens: cfg.ai.maxTokens,
+      messages: buildAiMessages({
+        cfg,
+        type,
+        meta,
+        messages: history,
+        botId: message.client.user.id,
+      }),
+    });
+    await sendAiText(message.channel, text);
+    aiErrorNotifiedChannels.delete(channelId);
+  } catch (err) {
+    console.warn('⚠️  Réponse IA du ticket échouée :', err.message);
+    if (!aiErrorNotifiedChannels.has(channelId)) {
+      aiErrorNotifiedChannels.add(channelId);
+      await message.channel.send(
+        '🤖 Petite panne de l\'assistante IA — un membre de l\'équipe prend le relais très vite !'
+      ).catch(() => {});
+    }
+  } finally {
+    aiInFlightChannels.delete(channelId);
+  }
+}
+
 /* ------------------------------ Interactions ------------------------------ */
 
 async function handleInteraction(interaction) {
   const cfg = getConfig().tickets;
 
-  // Bouton "Ouvrir un ticket" du panneau
-  if (interaction.isButton() && interaction.customId === OPEN_BUTTON_ID) {
+  // Boutons d'ouverture : 'ticket:open' (anciens panneaux) ou 'ticket:open:<typeId>'
+  if (interaction.isButton()
+    && (interaction.customId === OPEN_BUTTON_ID || interaction.customId.startsWith(`${OPEN_BUTTON_ID}:`))) {
     if (!cfg.enabled) {
       return interaction.reply({
         content: '🎫 Les tickets sont désactivés pour le moment. Réessaie un peu plus tard !',
@@ -413,10 +631,14 @@ async function handleInteraction(interaction) {
       });
     }
 
-    if (cfg.askSubject) {
+    const typeKey = interaction.customId.slice(OPEN_BUTTON_ID.length + 1) || null;
+    const type = typeByKey(cfg, typeKey);
+    const askSubject = type ? type.askSubject : cfg.askSubject;
+
+    if (askSubject) {
       const modal = new ModalBuilder()
-        .setCustomId(MODAL_ID)
-        .setTitle('🎫 Ouvrir un ticket')
+        .setCustomId(type ? `${MODAL_ID}:${type.id}` : MODAL_ID)
+        .setTitle((type ? `🎫 ${type.name}` : '🎫 Ouvrir un ticket').slice(0, 45))
         .addComponents(new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId('subject')
@@ -430,20 +652,22 @@ async function handleInteraction(interaction) {
     }
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    return createTicket(interaction, '');
+    return createTicket(interaction, '', type?.id);
   }
 
-  // Formulaire de sujet validé
-  if (interaction.isModalSubmit() && interaction.customId === MODAL_ID) {
+  // Formulaire de sujet validé ('ticket:modal:create' + éventuellement ':<typeId>')
+  if (interaction.isModalSubmit()
+    && (interaction.customId === MODAL_ID || interaction.customId.startsWith(`${MODAL_ID}:`))) {
     if (!cfg.enabled) {
       return interaction.reply({
         content: '🎫 Les tickets sont désactivés pour le moment.',
         flags: MessageFlags.Ephemeral,
       });
     }
+    const typeKey = interaction.customId.slice(MODAL_ID.length + 1) || null;
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const subject = interaction.fields.getTextInputValue('subject').trim();
-    return createTicket(interaction, subject);
+    return createTicket(interaction, subject, typeKey);
   }
 
   // Bouton "Fermer le ticket"
@@ -454,10 +678,16 @@ async function handleInteraction(interaction) {
 
 module.exports = {
   handleInteraction,
+  handleMessage,
   publishPanel,
   // Exportés pour les tests
   sanitizeChannelName,
   ticketChannelName,
   parseTicketTopic,
   formatTranscript,
+  ticketTypes,
+  typeByKey,
+  typeStaffRoleIds,
+  aiSystemPrompt,
+  buildAiMessages,
 };

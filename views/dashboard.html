@@ -196,11 +196,16 @@
           <!-- Rôle automatique -->
           <section class="card">
             <h2>🏷️ Rôle automatique</h2>
-            <p class="desc">Donne automatiquement un rôle à chaque nouveau membre (ex : « Membre »).
+            <p class="desc">Donne automatiquement un rôle à chaque nouveau membre.
               ⚠️ Dans les paramètres du serveur → Rôles, le rôle du bot doit être placé <b>au-dessus</b> du rôle à donner.</p>
 
             <div class="switch-row">
-              <div class="txt"><b>Rôle automatique</b><span>Attribuer un rôle à l'arrivée</span></div>
+              <div class="txt"><b>🔥 Rôle « Membre » automatique</b><span>Chaque nouveau membre reçoit tout seul le rôle <b>🔥・Membre</b> dès son arrivée (le bot le retrouve par son nom, rien à régler)</span></div>
+              <label class="switch"><input type="checkbox" data-bind="welcome.autoMemberRole" /><span class="track"></span></label>
+            </div>
+
+            <div class="switch-row">
+              <div class="txt"><b>Autre rôle automatique (optionnel)</b><span>Attribuer EN PLUS un autre rôle de ton choix à l'arrivée</span></div>
               <label class="switch"><input type="checkbox" data-bind="welcome.autoRole.enabled" /><span class="track"></span></label>
             </div>
 
@@ -272,9 +277,9 @@
     <section class="tab-panel" id="tab-tickets" style="display:none">
       <section class="card">
         <h2>🎫 Tickets — réglages généraux</h2>
-        <p class="desc">Le principe : tu publies un <b>panneau</b> (un joli message avec bouton) dans un salon.
-          Quand un membre clique, un <b>salon privé</b> est créé pour lui et les rôles du staff choisis ci-dessous.
-          Le bouton <b>🔒 Fermer</b> dans le ticket le clôture (avec transcription sauvegarde si tu veux).</p>
+        <p class="desc">Le principe : tu publies un <b>panneau</b> (un joli message avec <b>plusieurs boutons</b>) dans un salon.
+          Chaque bouton = un <b>type de ticket</b> (ci-dessous) avec ses propres rôles staff, son ping, son message d'ouverture et même sa propre IA.
+          Quand un membre clique, un <b>salon privé</b> est créé pour lui. Le bouton <b>🔒 Fermer</b> clôture le ticket (avec transcription sauvegarde si tu veux).</p>
 
         <div class="switch-row">
           <div class="txt"><b>Système de tickets</b><span>Activer ou couper complètement les tickets (le bouton du panneau répondra « désactivé »)</span></div>
@@ -294,9 +299,9 @@
         <label class="field-label">Nom de la catégorie (créée automatiquement si besoin)</label>
         <input type="text" data-bind="tickets.categoryName" maxlength="100" />
 
-        <label class="field-label">Rôles du staff qui voient les tickets</label>
+        <label class="field-label">Rôles du staff par défaut</label>
         <div id="ticketStaffRoles"></div>
-        <p class="hint">Ces rôles auront accès à tous les Salons de tickets (et seront notifiés si l'option « ping » est activée).</p>
+        <p class="hint">Utilisés quand un bouton n'a <b>aucun rôle coché</b> dans ses réglages (section « boutons » ci-dessous) et par les anciens panneaux.</p>
 
         <div class="grid-2">
           <div>
@@ -304,18 +309,18 @@
             <input type="number" data-bind="tickets.maxPerUser" min="1" max="10" />
           </div>
           <div>
-            <label class="field-label">Nom des Salons de tickets</label>
+            <label class="field-label">Nom des Salons de tickets (par défaut — chaque bouton peut avoir le sien)</label>
             <input type="text" data-bind="tickets.namePattern" maxlength="60" placeholder="ticket-{number}" />
             <p class="hint">Variables : <code class="var">{number}</code> = 001, 002... <code class="var">{user}</code> = pseudo. Ex : <code class="var">ticket-{user}</code></p>
           </div>
         </div>
 
         <div class="switch-row">
-          <div class="txt"><b>Demander le sujet</b><span>Petit formulaire « Sujet de ta demande » avant d'ouvrir le ticket</span></div>
+          <div class="txt"><b>Demander le sujet (par défaut)</b><span>Petit formulaire « Sujet de ta demande » — réglable bouton par bouton ci-dessous</span></div>
           <label class="switch"><input type="checkbox" data-bind="tickets.askSubject" /><span class="track"></span></label>
         </div>
         <div class="switch-row">
-          <div class="txt"><b>Notifier le staff (ping)</b><span>Les rôles staff sont mentionnés à l'ouverture d'un ticket</span></div>
+          <div class="txt"><b>Notifier le staff (ping, par défaut)</b><span>Les rôles staff sont mentionnés à l'ouverture — réglable bouton par bouton ci-dessous</span></div>
           <label class="switch"><input type="checkbox" data-bind="tickets.pingStaff" /><span class="track"></span></label>
         </div>
 
@@ -340,25 +345,162 @@
       </section>
 
       <section class="card">
-        <h2>🖼️ Le panneau (message public avec le bouton)</h2>
-        <p class="desc">C'est ce que les membres verront dans le salon choisi. Variables possibles : <code class="var">{server}</code> <code class="var">{memberCount}</code>.</p>
-        <div class="grid-2">
-          <div>
-            <label class="field-label">Texte du bouton</label>
-            <input type="text" data-bind="tickets.panelButtonLabel" maxlength="80" />
-          </div>
-          <div>
-            <label class="field-label">Emoji du bouton</label>
-            <input type="text" data-bind="tickets.panelButtonEmoji" maxlength="16" placeholder="🎫" />
-          </div>
-        </div>
+        <h2>🖼️ Le panneau (message public avec les boutons)</h2>
+        <p class="desc">C'est ce que les membres verront dans le salon choisi : cet encadré + <b>un bouton par type de ticket</b> (réglés dans la section suivante).
+          Variables possibles : <code class="var">{server}</code> <code class="var">{memberCount}</code>.</p>
         <div id="ticketPanelEmbedForm"></div>
       </section>
 
       <section class="card">
+        <h2>🔘 Les boutons du panneau (types de tickets)</h2>
+        <p class="desc">Chaque type a <b>son bouton</b> sur le panneau, <b>ses rôles staff</b> (accès + ping), <b>son message d'ouverture</b> et <b>son comportement IA</b>.
+          Choisis un type ci-dessous pour le modifier, ou crée-en un nouveau.</p>
+
+        <label class="field-label">Type à modifier</label>
+        <div class="template-bar">
+          <select id="ticketTypeSelect"></select>
+          <button class="btn btn-ghost btn-sm" id="newTicketTypeBtn" type="button">➕ Nouveau bouton</button>
+          <button class="btn btn-ghost btn-sm btn-danger-ghost" id="deleteTicketTypeBtn" type="button">🗑️ Supprimer</button>
+        </div>
+
+        <div id="ticketTypeForm">
+          <div class="grid-2">
+            <div>
+              <label class="field-label">Nom du type (titre du formulaire)</label>
+              <input type="text" id="tt_name" maxlength="80" />
+            </div>
+            <div>
+              <label class="field-label">Identifiant technique (lettres, chiffres, tirets)</label>
+              <input type="text" id="tt_id" maxlength="40" />
+              <p class="hint">⚠️ Ne le change pas après avoir publié : les anciens boutons pointent vers cet identifiant.</p>
+            </div>
+          </div>
+          <div class="grid-3">
+            <div>
+              <label class="field-label">Emoji du bouton</label>
+              <input type="text" id="tt_buttonEmoji" maxlength="16" placeholder="🎫" />
+            </div>
+            <div>
+              <label class="field-label">Texte du bouton</label>
+              <input type="text" id="tt_buttonLabel" maxlength="80" />
+            </div>
+            <div>
+              <label class="field-label">Couleur du bouton</label>
+              <select id="tt_buttonStyle">
+                <option value="Primary">🔵 Bleu (Primary)</option>
+                <option value="Secondary">⚪ Gris (Secondary)</option>
+                <option value="Success">🟢 Vert (Success)</option>
+                <option value="Danger">🔴 Rouge (Danger)</option>
+              </select>
+            </div>
+          </div>
+
+          <label class="field-label">Rôles staff de CE bouton (ils voient ces tickets + sont pingés)</label>
+          <div id="ticketTypeStaffRoles"></div>
+          <p class="hint">Si tu ne coches rien, ce sont les <b>rôles staff par défaut</b> (tout en haut) qui sont utilisés.</p>
+
+          <div class="grid-2">
+            <div>
+              <label class="field-label">Catégorie propre à ce type (optionnel)</label>
+              <select id="tt_categoryId"></select>
+              <label class="field-label">...ou colle l'ID à la main</label>
+              <input type="text" id="tt_categoryIdManual" placeholder="Vide = catégorie générale" />
+            </div>
+            <div>
+              <label class="field-label">Nom de sa catégorie (si elle doit être créée)</label>
+              <input type="text" id="tt_categoryName" maxlength="100" placeholder="Vide = catégorie générale" />
+              <label class="field-label">Nom des Salons de ce type</label>
+              <input type="text" id="tt_namePattern" maxlength="60" placeholder="ticket-{number}" />
+              <p class="hint"><code class="var">{number}</code> = 001... <code class="var">{user}</code> = pseudo.</p>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <div class="txt"><b>Demander le sujet (ce bouton)</b><span>Petit formulaire avant d'ouvrir le ticket</span></div>
+            <label class="switch"><input type="checkbox" id="tt_askSubject" /><span class="track"></span></label>
+          </div>
+          <div class="switch-row">
+            <div class="txt"><b>Notifier le staff (ce bouton)</b><span>Les rôles cochés ci-dessus sont mentionnés à l'ouverture</span></div>
+            <label class="switch"><input type="checkbox" id="tt_pingStaff" /><span class="track"></span></label>
+          </div>
+          <div class="switch-row">
+            <div class="txt"><b>🤖 IA active pour ce type</b><span>L'assistante IA peut répondre dans les tickets ouverts avec ce bouton</span></div>
+            <label class="switch"><input type="checkbox" id="tt_aiEnabled" /><span class="track"></span></label>
+          </div>
+
+          <label class="field-label">🧠 Consignes spéciales pour l'IA de ce bouton (en plus des consignes générales)</label>
+          <textarea id="tt_aiPrompt" maxlength="4000" rows="4" placeholder="Ex : Pour une commande de clip, demande le lien de la vidéo source, le format voulu, la date souhaitée. N'annonce aucun prix."></textarea>
+          <p class="hint">Exemple : les questions à poser, les infos à récolter, le ton à adopter.</p>
+        </div>
+      </section>
+
+      <section class="card">
         <h2>💬 Message d'ouverture (dans le ticket)</h2>
-        <p class="desc">Le premier message dans le salon privé du ticket. Variables possibles : <code class="var">{user}</code> <code class="var">{username}</code> <code class="var">{number}</code> (n° du ticket) <code class="var">{subject}</code> <code class="var">{server}</code>.</p>
+        <p class="desc">Le premier message dans le salon privé du ticket — <b>propre au type choisi ci-dessus</b>.
+          Variables possibles : <code class="var">{user}</code> <code class="var">{username}</code> <code class="var">{number}</code> (n° du ticket) <code class="var">{subject}</code> <code class="var">{server}</code>.</p>
         <div id="ticketOpenEmbedForm"></div>
+      </section>
+
+      <section class="card">
+        <h2>🤖 Assistante IA des tickets (Mistral)</h2>
+        <p class="desc">L'IA accueille le membre et répond à ses messages dans le ticket.
+          3 conditions pour qu'elle parle : <b>1)</b> la clé <code class="var">MISTRAL_API_KEY</code> collée dans ton fichier <code class="var">.env</code>,
+          <b>2)</b> <b>MESSAGE CONTENT INTENT</b> activé sur le portail développeur discord (ton appli → <b>Bot</b>),
+          <b>3)</b> un <b>redémarrage</b> du bot après l'activation. L'état en direct s'affiche ci-dessous.</p>
+        <div id="aiStatusBox">⏳ Vérification de l'IA…</div>
+
+        <div class="switch-row">
+          <div class="txt"><b>Activer l'assistante IA</b><span>Réglage général (chaque bouton peut ensuite l'activer ou non)</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.ai.enabled" /><span class="track"></span></label>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">Modèle Mistral</label>
+            <input type="text" data-bind="tickets.ai.model" maxlength="80" placeholder="mistral-large-2512" />
+            <p class="hint">Ton compte : modèle <b>mistral-large-2512</b>, 250 000 tokens/min, 1 requête/seconde — le bot espace tout seul ses appels.</p>
+          </div>
+          <div>
+            <label class="field-label">Quand l'IA répond-elle ?</label>
+            <select id="aiTriggerSelect">
+              <option value="messages">💬 À chaque message du membre</option>
+              <option value="mention">👋 Seulement si on mentionne @le bot</option>
+              <option value="accueil">🎉 Uniquement le message d'accueil</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="switch-row">
+          <div class="txt"><b>Message d'accueil IA</b><span>À l'ouverture, l'IA écrit un premier message personnalisé (elle lit le sujet annoncé)</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.ai.greetOnOpen" /><span class="track"></span></label>
+        </div>
+        <div class="switch-row">
+          <div class="txt"><b>Pause si le staff répond</b><span>Dès qu'un humain de l'équipe écrit dans le ticket, l'IA se tait (sauf si on la mentionne)</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.ai.pauseWhenStaffReplies" /><span class="track"></span></label>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label">Créativité (0 = très sérieux, 1,5 = très libre)</label>
+            <input type="number" data-bind="tickets.ai.temperature" min="0" max="1.5" step="0.1" />
+          </div>
+          <div>
+            <label class="field-label">Longueur max d'une réponse (tokens, ~1 token ≈ 4 signes)</label>
+            <input type="number" data-bind="tickets.ai.maxTokens" min="50" max="2000" step="10" />
+          </div>
+          <div>
+            <label class="field-label">Mémoire : derniers messages relus à chaque réponse</label>
+            <input type="number" data-bind="tickets.ai.historyLimit" min="1" max="30" />
+          </div>
+          <div>
+            <label class="field-label">Délai minimum entre 2 réponses IA (secondes)</label>
+            <input type="number" data-bind="tickets.ai.cooldownSeconds" min="1" max="60" />
+          </div>
+        </div>
+
+        <label class="field-label">🧠 Consignes générales de l'IA (pour tous les tickets)</label>
+        <textarea data-bind="tickets.ai.systemPrompt" maxlength="6000" rows="6" placeholder="Tu es l'assistante IA de Virality…"></textarea>
+        <p class="hint">Explique-lui son rôle, son ton, et ce qu'elle ne DOIT JAMAIS faire (inventer des prix, demander des mots de passe...). Les consignes propres à chaque bouton s'ajoutent par-dessus.</p>
       </section>
 
       <section class="card">

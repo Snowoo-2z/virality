@@ -5,11 +5,11 @@ Le bot discord officiel du serveur **Virality**. Il gère la **bienvenue**, le *
 - 🖥️ **Dashboard web** (page dans ton navigateur, protégée par mot de passe) organisé en onglets : **👋 Bienvenue**, **🎨 Rôles**, **🎫 Tickets**, **🧱 Embeds**, **🏗️ Structure & sauvegarde**
 - 💬 **Commande `/config`** directement dans discord (boutons + menus, réservée aux administrateurs) pour la bienvenue
 
-### Les 3 onglets du dashboard
+### Les 5 onglets du dashboard
 
 - **👋 Bienvenue** : le message d'accueil des nouveaux membres (voir détail ci-dessous), avec aperçu en direct
 - **🎨 Rôles du serveur** : en 1 clic, renomme + recolore les rôles du staff aux couleurs Virality et crée les rôles **Accueil**, **Membre** et **Clipper** (noms/couleurs ajustables, permissions inchangées)
-- **🎫 Tickets** : système de support complet — panneau stylé avec bouton publié dans le salon de ton choix, salon privé créé automatiquement pour le membre + les rôles staff cochés, formulaire de sujet optionnel, ping du staff, fermeture avec **transcription** (.txt) dans un salon de logs et/ou en MP. Tout est réglable : noms des Salons (`ticket-{number}` ou `ticket-{user}`), max de tickets par membre, textes et couleurs du panneau et du message d'ouverture
+- **🎫 Tickets** : système de support complet — panneau stylé avec **plusieurs boutons** publié dans le salon de ton choix. **Chaque bouton = un type de ticket différent** (Question/Support, Commander un clip, Partenariat, + les tiens) avec **ses rôles staff à pinger**, **son message d'ouverture**, **sa catégorie**, **son nom de salon** et **son comportement IA**. Salon privé créé automatiquement, formulaire de sujet optionnel, fermeture avec **transcription** (.txt) dans un salon de logs et/ou en MP. En bonus : une **assistante IA Mistral** (`mistral-large-2512`) peut accueillir le membre et répondre dans le ticket — modèle, déclencheur, créativité, mémoire et consignes (générales + par bouton) sont réglables depuis cet onglet
 - **🧱 Embeds** : créateur d'embeds 100 % personnalisable (auteur, titre, description, couleur, footer, grande image, miniature, horodatage, **champs** titre+texte, texte au-dessus, mentions @everyone) avec aperçu en direct, **modèles enregistrables** et envoi en 1 clic dans le salon de ton choix
 - **🏗️ Structure & sauvegarde** : en 1 clic, construis tout le serveur — catégories **📌 Informations** (annonces, bienvenue, à-propos, en lecture seule), **💬 Communauté** (success-flex, proof, tickets) et **🔒 Espace Clipper** privé (commandes, discussion, bonus : les Membres voient sans l'historique, les Clippers voient tout). Le bot ne supprime jamais rien : il crée ce qui manque et range ce qui existe. C'est aussi là qu'on active la **sauvegarde automatique sur Supabase** (optionnelle) : une copie de tes réglages est envoyée à chaque enregistrement, et récupérée toute seule si tu changes de PC (voir les lignes `SUPABASE_...` dans `.env.example` et le fichier `supabase/schema.sql`)
 
@@ -23,7 +23,7 @@ Le bot ne fonctionne **que sur le serveur Virality** (`1562033502612885534`) : s
 - Miniature : avatar du nouveau membre, logo Virality, ou aucune
 - Mention du nouveau membre (notification) activable
 - **Message privé** de bienvenue en option (lui aussi personnalisable)
-- **Rôle automatique** donné à l'arrivée (avec délai optionnel)
+- **Rôle 🔥・Membre donné automatiquement** à l'arrivée (activé par défaut, le bot retrouve le rôle tout seul) + un autre rôle automatique au choix en option
 - Variables automatiques dans les textes : `{user}` `{username}` `{server}` `{memberCount}`
 - Bouton **« Envoyer un test »** pour voir le résultat sans attendre un vrai nouveau membre
 
@@ -41,7 +41,7 @@ Installe-la comme n'importe quel logiciel (suivant, suivant, terminer).
 1. Va sur <https://discord.com/developers/applications> et connecte-toi
 2. Bouton **« New Application »** → nomme-la par exemple `Virality` → **Create**
 3. Dans le menu de gauche : **Bot**
-4. ⚠️ **TRÈS IMPORTANT** : descends jusqu'à « Privileged Gateway Intents » et **active « SERVER MEMBERS INTENT »** (sinon le bot ne verra pas les nouveaux membres arriver), puis **Save Changes**
+4. ⚠️ **TRÈS IMPORTANT** : descends jusqu'à « Privileged Gateway Intents » et **active « SERVER MEMBERS INTENT »** (sinon le bot ne verra pas les nouveaux membres arriver). Active aussi **« MESSAGE CONTENT INTENT »** si tu veux l'**IA dans les tickets** (c'est ce qui permet au bot de lire les messages des membres), puis **Save Changes**
 5. En haut de cette même page Bot : **« Reset Token »** → confirme → **copie le token** qui s'affiche (c'est le mot de passe du bot, garde-le secret !)
 6. (Optionnel mais joli) Sur la page **General Information**, mets le logo Virality comme icône, et sur la page **Bot** tu peux aussi mettre un avatar / une bannière au bot.
 
@@ -51,6 +51,7 @@ Installe-la comme n'importe quel logiciel (suivant, suivant, terminer).
 2. Ouvre `.env` avec le Bloc-notes et remplace :
    - `DISCORD_TOKEN=colle_ton_token_ici` → colle ton token de l'étape 2
    - `DASHBOARD_PASSWORD=choisis_un_mot_de_passe` → choisis le mot de passe que tu veux pour le dashboard
+   - (Optionnel — pour l'IA des tickets) `MISTRAL_API_KEY=colle_ta_cle_mistral_ici` → ta clé créée sur <https://console.mistral.ai> (menu « API Keys »)
 3. Enregistre et ferme. (Le reste est déjà rempli, ne touche pas à `GUILD_ID`.)
 
 > 🤐 **Ne partage jamais ton fichier `.env` ni ton token.** Quelqu'un qui a le token contrôle ton bot.
@@ -81,6 +82,16 @@ Tape `/config` dans n'importe quel salon du serveur (il faut être administrateu
 
 Les deux modifient la **même configuration** (fichier `data/config.json`), appliquée immédiatement, sans redémarrer le bot.
 
+### 🤖 Activer l'assistante IA des tickets (optionnel)
+
+1. Va sur <https://console.mistral.ai> → **API Keys** → crée une clé → **copie-la**
+2. Ouvre ton fichier `.env` (Bloc-notes) → colle la clé après **`MISTRAL_API_KEY=`** → **Enregistre**
+3. Va sur <https://discord.com/developers/applications> → ton application → **Bot** → active **« MESSAGE CONTENT INTENT »** → **Save Changes**
+4. Dans le dashboard, onglet **🎫 Tickets** → section **« 🤖 Assistante IA »** → allume **« Activer l'assistante IA »** → **💾 Enregistrer** (bouton orange en haut de l'onglet Bienvenue)
+5. **Ferme la fenêtre noire du bot et relance-le** (l'écoute des messages ne peut démarrer qu'au lancement) — l'encadré d'état dans le dashboard doit afficher **✅ IA en ligne**
+
+Ton modèle `mistral-large-2512` autorise 250 000 tokens/minute et 1 requête/seconde : le bot espace tout seul ses appels pour ne jamais dépasser. Pour chaque **bouton** du panneau, tu peux dire à l'IA quoi faire (ex : pour « Commander un clip », récolter le brief complet) dans **« Consignes spéciales »** du type.
+
 ---
 
 ## 🧩 Variables pour personnaliser les textes
@@ -104,9 +115,10 @@ Tu peux aussi mettre du `**gras**` et de l' `*italique*` comme dans discord.
 |---|---|
 | `⚠️ TOKEN DISCORD MANQUANT` au démarrage | Tu n'as pas créé le fichier `.env`, ou pas collé le token dedans (voir étape 3). Le dashboard marche quand même. |
 | `❌ CONNEXION À DISCORD IMPOSSIBLE ... invalid token` | Le token dans le `.env` n'est pas le bon. Refais l'étape 2 (Reset Token) et recolle-le. |
-| Erreur `disallowed intents` | Tu as oublié d'activer **SERVER MEMBERS INTENT** sur le portail développeur (étape 2, point 4). |
+| Erreur `disallowed intents` | Tu as oublié d'activer **SERVER MEMBERS INTENT** (et **MESSAGE CONTENT INTENT** si l'IA est activée) sur le portail développeur (étape 2, point 4). |
 | Le bot est en ligne mais aucun message de bienvenue | Vérifie dans le dashboard : système **activé** + **salon choisi**. Puis teste avec le bouton « Envoyer un test ». Vérifie aussi que le bot a le droit d'écrire dans ce salon. |
 | Le rôle automatique ne se donne pas | Paramètres du serveur → **Rôles** : glisse le rôle du bot **au-dessus** du rôle à donner. discord refuse sinon. |
+| L'IA des tickets ne répond pas | Regarde l'encadré d'état dans l'onglet **🎫 Tickets** du dashboard : il te dit ce qui manque. Les 3 causes classiques : pas de clé `MISTRAL_API_KEY` dans le `.env` • **MESSAGE CONTENT INTENT** pas coché sur le portail développeur • le bot pas **redémarré** après l'activation. Et si un membre du staff a déjà répondu dans le ticket, l'IA se met en pause (c'est un réglage). |
 | La commande `/config` n'apparaît pas | Elle est réservée aux administrateurs et enregistrée au démarrage du bot. Redémarre le bot, attends quelques secondes, réessaie. |
 | `EADDRINUSE` / le dashboard ne démarre pas | Le port 3000 est déjà pris (bot lancé deux fois ?). Ferme l'autre fenêtre, ou change `DASHBOARD_PORT` dans le `.env`. |
 | Mot de passe du dashboard oublié | C'est `DASHBOARD_PASSWORD` dans ton fichier `.env`. Si tu ne l'as jamais défini, il s'affiche dans la fenêtre noire au démarrage du bot. |
@@ -122,7 +134,10 @@ virality/
 ├── src/
 │   ├── index.js         ← démarrage (bot + dashboard)
 │   ├── bot.js           ← le bot discord (limité au serveur Virality)
-│   ├── welcome.js       ← envoi des messages de bienvenue
+│   ├── welcome.js       ← envoi des messages de bienvenue + rôle Membre auto
+│   ├── tickets.js       ← les tickets (boutons, Salons privés, IA)
+│   ├── embeds.js        ← fabrication des embeds (tickets + créateur)
+│   ├── ai.js            ← l'assistante IA Mistral des tickets
 │   ├── configPanel.js   ← la commande /config dans discord
 │   ├── dashboard.js     ← le serveur du dashboard web
 │   └── config.js        ← lecture/écriture de la configuration

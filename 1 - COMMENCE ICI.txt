@@ -36,6 +36,20 @@ Mot de passe : celui que tu as ecrit dans le fichier
 .env (ligne DASHBOARD_PASSWORD=...).
 
 --------------------------------------------------
+BONUS : l'IA dans les tickets (optionnel)
+--------------------------------------------------
+1) Cree ta cle sur https://console.mistral.ai
+   et colle-la dans le fichier .env, sur la
+   ligne MISTRAL_API_KEY=...
+2) Sur https://discord.com/developers/applications
+   -> ton appli -> Bot -> active
+   "MESSAGE CONTENT INTENT" -> Save Changes.
+3) Dans le dashboard, onglet Tickets, allume
+   "Activer l'assistante IA", enregistre,
+   puis FERME la fenetre noire et relance
+   DEMARRER.bat. C'est tout !
+
+--------------------------------------------------
 BLOQUE QUELQUE PART ?
 --------------------------------------------------
 Fais une capture d'ecran de la fenetre noire et

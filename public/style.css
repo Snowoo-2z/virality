@@ -222,6 +222,25 @@ select:disabled, input:disabled { opacity: 0.55; }
 .card p.desc { font-size: 13px; color: var(--text-faint); margin-bottom: 8px; line-height: 1.5; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 16px; }
+@media (max-width: 760px) { .grid-3 { grid-template-columns: 1fr; } }
+
+/* État de l'IA (onglet Tickets) */
+#aiStatusBox {
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  padding: 11px 14px;
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.btn-danger-ghost:hover { border-color: var(--red); color: var(--red); }
+
+/* Variantes de couleurs des faux boutons discord (aperçu du panneau) */
+.fake-button { margin-right: 6px; }
+.fake-button.secondary { background: #4e5058; }
+.fake-button.success { background: #248046; }
 
 .vars { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .var-chip {
