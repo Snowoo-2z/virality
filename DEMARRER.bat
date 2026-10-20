@@ -64,6 +64,7 @@ goto SUITE
 :SUITE
 rem ---------- Installation des morceaux du bot (1ere fois) ----------
 if not exist "node_modules" goto INSTALLER
+if not exist "node_modules\@supabase" goto INSTALLER
 goto LANCER
 
 :INSTALLER

@@ -15,7 +15,7 @@ if [ ! -f ".env" ]; then
   echo ""
 fi
 
-if [ ! -d "node_modules" ]; then
+if [ ! -d "node_modules" ] || [ ! -d "node_modules/@supabase" ]; then
   echo "[INFO] Première installation des dépendances, ça peut prendre 1 minute..."
   npm install
   echo ""
