@@ -203,6 +203,25 @@
           </div>
         </section>
 
+        <!-- Rôles du serveur -->
+        <section class="card">
+          <h2>🎨 Rôles du serveur — style en 1 clic</h2>
+          <p class="desc">En un seul clic, le bot renomme et recolore les rôles du staff aux couleurs 🔥 de Virality,
+            les affiche séparément dans la liste des membres, et crée les rôles <b>Accueil</b> et <b>Membre</b> s'ils n'existent pas encore.
+            Tu peux ajuster les noms et les couleurs ci-dessous avant de cliquer (pense à « 💾 Enregistrer » ou laisse le bouton orange tout faire).
+            <b>Les permissions des rôles ne changent pas.</b></p>
+
+          <div id="rolesList"></div>
+
+          <p class="hint">⚠️ discord interdit au bot de modifier un rôle placé <b>au-dessus</b> du sien.
+            Si un rôle refuse : dans discord → Paramètres du serveur → <b>Rôles</b> → glisse le rôle du bot au-dessus des rôles du staff, puis reclique ici.</p>
+
+          <div style="margin-top:16px">
+            <button class="btn btn-primary" id="applyRolesBtn">🎨 Enregistrer + appliquer le style aux rôles</button>
+          </div>
+          <div id="rolesResult"></div>
+        </section>
+
         <!-- Variables -->
         <section class="card">
           <h2>🧩 Variables utilisables dans les textes</h2>

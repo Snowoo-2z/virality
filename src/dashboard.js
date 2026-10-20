@@ -120,6 +120,13 @@ function startDashboard() {
     res.json({ ok: true });
   });
 
+  // Applique le style des rôles sur le serveur (renomme/recolore + crée Accueil/Membre)
+  app.post('/api/roles/apply', requireAuthApi, async (req, res) => {
+    const result = await bot.applyRolesStyle();
+    if (!result.ok && result.reason) return res.status(400).json({ error: result.reason });
+    res.json({ ok: true, results: result.results, config: result.config });
+  });
+
   app.listen(port, '0.0.0.0', () => {
     console.log('');
     console.log('🖥️  DASHBOARD WEB PRÊT');

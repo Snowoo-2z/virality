@@ -132,6 +132,76 @@ function fillGuildSelects() {
   syncRoleSelect();
 }
 
+/* ---------- Rôles du serveur (style en 1 clic) ---------- */
+function buildRoleRows() {
+  const container = $('#rolesList');
+  if (!container || !Array.isArray(config?.rolesStyle)) return;
+  container.innerHTML = config.rolesStyle.map((entry, i) => `
+    <div class="role-row">
+      <div class="role-head">
+        <span class="role-chip" id="roleChip-${entry.key}"></span>
+        <span class="role-label">${escapeHtml(entry.label)}</span>
+        <span class="role-status" id="roleStatus-${entry.key}"></span>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-label">Nom affiché</label>
+          <input type="text" data-bind="rolesStyle.${i}.name" maxlength="100" />
+        </div>
+        <div>
+          <label class="field-label">Couleur</label>
+          <div class="color-row">
+            <input type="color" data-bind="rolesStyle.${i}.color" />
+            <input type="text" data-bind="rolesStyle.${i}.color" placeholder="#FF6A00" />
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+/* Met à jour les pastilles colorées (aperçu en direct, façon discord) */
+function updateRoleChips() {
+  if (!Array.isArray(config?.rolesStyle)) return;
+  for (const entry of config.rolesStyle) {
+    const chip = document.getElementById('roleChip-' + entry.key);
+    if (!chip) continue;
+    const raw = (entry.color || '').trim();
+    const color = /^#?[0-9a-fA-F]{6}$/.test(raw)
+      ? (raw.startsWith('#') ? raw : '#' + raw)
+      : '#FF6A00';
+    chip.textContent = entry.name?.trim() || '(sans nom)';
+    chip.style.color = color;
+    chip.style.borderColor = color;
+    chip.style.backgroundColor = color + '24';
+  }
+}
+
+/* Indique, pour chaque rôle, s'il existe déjà sur le serveur ou s'il sera créé */
+function markRoleStatuses() {
+  if (!Array.isArray(config?.rolesStyle)) return;
+  for (const entry of config.rolesStyle) {
+    const el = document.getElementById('roleStatus-' + entry.key);
+    if (!el) continue;
+    if (!guild?.online || !guild?.onGuild) {
+      el.textContent = 'Bot hors ligne';
+      continue;
+    }
+    const found = entry.id ? guild.roles.find((r) => r.id === entry.id) : null;
+    if (found) el.textContent = `✅ Sur le serveur : « ${found.name} »`;
+    else if (entry.creatable) el.textContent = '✨ Sera créé quand tu cliqueras le bouton orange';
+    else el.textContent = '⚠️ Introuvable sur le serveur';
+  }
+}
+
+function renderRolesResult(results) {
+  const box = $('#rolesResult');
+  if (!box) return;
+  const icons = { created: '✨', updated: '✅', error: '❌' };
+  box.innerHTML = '<div class="roles-result">' + results.map((r) =>
+    `<div class="roles-result-line ${r.status}">${icons[r.status] || '•'} <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.message)}</div>`
+  ).join('') + '</div>';
+}
+
 /* ---------- Statut du bot ---------- */
 function renderStatus() {
   const badge = $('#statusBadge');
@@ -259,7 +329,9 @@ async function loadAll() {
     return;
   }
   await loadGuild();
+  buildRoleRows();
   fillForm();
+  updateRoleChips();
   renderPreview();
 }
 
@@ -271,6 +343,7 @@ async function loadGuild() {
   }
   renderStatus();
   fillGuildSelects();
+  markRoleStatuses();
 }
 
 /* ---------- Événements ---------- */
@@ -285,6 +358,7 @@ document.addEventListener('input', (e) => {
   }
   collectForm();
   updateConditionalSections();
+  updateRoleChips();
   renderPreview();
 });
 
@@ -292,6 +366,7 @@ document.addEventListener('change', (e) => {
   if (!e.target.dataset?.bind || !config) return;
   collectForm();
   updateConditionalSections();
+  updateRoleChips();
   renderPreview();
 });
 
@@ -322,6 +397,7 @@ $('#saveBtn').addEventListener('click', async () => {
     const data = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
     config = data.config;
     fillForm();
+    updateRoleChips();
     renderPreview();
     showToast('✅ Configuration enregistrée ! Elle est déjà active sur le bot.');
   } catch (err) {
@@ -346,6 +422,35 @@ $('#testBtn').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
     btn.textContent = '📨 Enregistrer + envoyer un test sur discord';
+  }
+});
+
+$('#applyRolesBtn').addEventListener('click', async () => {
+  collectForm();
+  const btn = $('#applyRolesBtn');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Application en cours sur discord...';
+  try {
+    const saved = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
+    config = saved.config;
+    const data = await api('/api/roles/apply', { method: 'POST', body: '{}' });
+    if (data.config) config = data.config;
+    fillForm();
+    updateRoleChips();
+    renderRolesResult(data.results || []);
+    await loadGuild(); // rafraîchit les listes déroulantes (rôle auto...) et les statuts des rôles
+    const errorCount = (data.results || []).filter((r) => r.status === 'error').length;
+    if (errorCount > 0) {
+      showToast(`⚠️ Terminé, mais ${errorCount} rôle(s) ont résisté — regarde le détail sous le bouton orange.`, true);
+    } else {
+      showToast('🎨 Style appliqué aux rôles du serveur ! Va admirer la liste des membres sur discord 👀');
+    }
+  } catch (err) {
+    showToast('❌ ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
   }
 });
 

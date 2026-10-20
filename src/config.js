@@ -52,6 +52,75 @@ const DEFAULTS = {
       delaySeconds: 0,
     },
   },
+
+  /**
+   * Style des rôles du serveur, appliqué en 1 clic depuis le dashboard.
+   * Les 4 rôles du staff existent déjà (id renseigné) : on les renomme/recolore.
+   * Membre et Accueil seront créés par le bot au premier clic (creatable).
+   * hoist = "afficher séparément dans la liste des membres".
+   */
+  rolesStyle: [
+    {
+      key: 'fondateur',
+      label: 'Fondateur (rôle existant)',
+      id: '1562040635345735751',
+      name: '👑・Fondateur',
+      color: '#FFB020',
+      emoji: '👑',
+      hoist: true,
+      creatable: false,
+    },
+    {
+      key: 'gerant',
+      label: 'Gérant Pôle Modération (rôle existant)',
+      id: '1562040762722553876',
+      name: '🛡️・Gérant Modération',
+      color: '#FF6A00',
+      emoji: '🛡️',
+      hoist: true,
+      creatable: false,
+    },
+    {
+      key: 'moderateur',
+      label: 'modérateur (rôle existant)',
+      id: '1562040845689946122',
+      name: '🔨・modérateur',
+      color: '#F04E23',
+      emoji: '🔨',
+      hoist: true,
+      creatable: false,
+    },
+    {
+      key: 'moderateur-test',
+      label: 'modérateur en Test (rôle existant)',
+      id: '1562040906603823124',
+      name: '🌱・modérateur en Test',
+      color: '#C97B4A',
+      emoji: '🌱',
+      hoist: true,
+      creatable: false,
+    },
+    {
+      key: 'accueil',
+      label: 'Accueil (nouveau rôle, créé au clic)',
+      id: '',
+      name: '👋・Accueil',
+      color: '#FFCF87',
+      emoji: '👋',
+      hoist: true,
+      creatable: true,
+    },
+    {
+      key: 'membre',
+      label: 'Membre (nouveau rôle, créé au clic)',
+      id: '',
+      name: '🔥・Membre',
+      color: '#FF9E57',
+      emoji: '🔥',
+      hoist: false,
+      creatable: true,
+    },
+  ],
 };
 
 function deepMerge(target, source) {
@@ -95,6 +164,25 @@ function normalizeEmbedSection(embed, defaults) {
   };
 }
 
+/** Reconstruit proprement la liste des styles de rôles (par clé). */
+function normalizeRolesStyle(input) {
+  const fromUser = Array.isArray(input) ? input : [];
+  return DEFAULTS.rolesStyle.map((def) => {
+    const saved = fromUser.find((r) => r && r.key === def.key) || {};
+    const name = String(saved.name ?? def.name).trim().slice(0, 100);
+    return {
+      key: def.key,
+      label: def.label,
+      id: String(saved.id ?? def.id).trim(),
+      name: name || def.name,
+      color: normalizeColor(saved.color, def.color),
+      emoji: def.emoji,
+      hoist: typeof saved.hoist === 'boolean' ? saved.hoist : def.hoist,
+      creatable: def.creatable,
+    };
+  });
+}
+
 /** Nettoie/valide une config complète (utilisée par le dashboard web). */
 function normalizeConfig(input) {
   const base = structuredClone(DEFAULTS);
@@ -119,6 +207,8 @@ function normalizeConfig(input) {
   w.autoRole.delaySeconds = Number.isFinite(delay)
     ? Math.min(3600, Math.max(0, Math.floor(delay)))
     : 0;
+
+  merged.rolesStyle = normalizeRolesStyle(merged.rolesStyle);
   return merged;
 }
 
