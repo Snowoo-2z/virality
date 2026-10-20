@@ -1,0 +1,43 @@
+==================================================
+   VIRALITY BOT - INSTALLATION FACILE
+==================================================
+
+Fais juste ca, dans l'ordre. Rien d'autre.
+
+--------------------------------------------------
+ETAPE 1 : Installe Node.js (a faire 1 seule fois)
+--------------------------------------------------
+Va sur : https://nodejs.org/fr
+Clique le gros bouton vert, ouvre le fichier
+telecharge, puis clique "Suivant" jusqu'au bout.
+
+--------------------------------------------------
+ETAPE 2 : Double-clique sur DEMARRER.bat
+--------------------------------------------------
+Il est dans ce meme dossier.
+Une fenetre noire s'ouvre : LAISSE-TOI GUIDER.
+Elle ouvrira le Bloc-notes toute seule pour que
+tu colles ton token discord (le code secret du bot).
+
+Si Windows affiche un ecran bleu "Windows a protege
+votre PC" : clique "Informations complementaires",
+puis "Executer quand meme". C'est normal.
+
+--------------------------------------------------
+ETAPE 3 : Laisse la fenetre noire ouverte
+--------------------------------------------------
+C'est elle, le bot. La fermer = eteindre le bot.
+
+--------------------------------------------------
+ETAPE 4 : Ouvre le dashboard
+--------------------------------------------------
+Dans Chrome, tape : http://localhost:3000
+Mot de passe : celui que tu as ecrit dans le fichier
+.env (ligne DASHBOARD_PASSWORD=...).
+
+--------------------------------------------------
+BLOQUE QUELQUE PART ?
+--------------------------------------------------
+Fais une capture d'ecran de la fenetre noire et
+montre-la moi dans la conversation, en disant
+a quelle etape tu es bloque. On avance ensemble.
