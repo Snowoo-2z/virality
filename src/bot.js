@@ -108,7 +108,8 @@ function buildInviteUrl(clientId) {
     PermissionFlagsBits.SendMessages,
     PermissionFlagsBits.EmbedLinks,
     PermissionFlagsBits.AttachFiles,
-    PermissionFlagsBits.ManageRoles, // pour le rôle automatique
+    PermissionFlagsBits.ManageRoles, // rôle automatique + style des rôles
+    PermissionFlagsBits.ManageChannels, // construction du serveur (catégories/Salons)
   ]).bitfield.toString();
   return (
     `https://discord.com/oauth2/authorize?client_id=${clientId}` +
@@ -326,4 +327,298 @@ async function applyRolesStyle() {
   return { ok: okCount > 0, results, config: getConfig() };
 }
 
-module.exports = { startBot, getGuildInfo, sendTestWelcome, applyRolesStyle, GUILD_ID };
+/* ---------------- Construction du serveur (dashboard, 1 clic) ---------------- */
+
+// Autres noms possibles pour retrouver un salon/catégorie déjà existant
+// au lieu d'en créer un deuxième (comparaison sans emoji ni accents).
+const CATEGORY_ALIASES = {
+  informations: ['informations', 'information', 'infos', 'info'],
+  communaute: ['communaute', 'community'],
+  clipper: ['clipper', 'clippers', 'espaceclipper'],
+};
+const CHANNEL_ALIASES = {
+  annonces: ['annonces', 'annonce', 'announcements', 'announcement'],
+  bienvenue: ['bienvenue', 'welcome', 'arrivees'],
+  'a-propos': ['apropos', 'about'],
+  'success-flex': ['successflex', 'sucessflex', 'flex'],
+  proof: ['proof', 'preuves'],
+  tickets: ['tickets', 'ticket', 'support'],
+  commandes: ['commandes', 'commande', 'orders'],
+  discussion: ['discussion', 'discussions'],
+  bonus: ['bonus'],
+};
+
+function matchesName(name, clé, aliasesMap, wantedName) {
+  const simple = simplifyRoleName(name);
+  const candidates = [
+    simplifyRoleName(wantedName),
+    simplifyRoleName(clé),
+    ...(aliasesMap[clé] || []).map(simplifyRoleName),
+  ];
+  return candidates.includes(simple);
+}
+
+/** Retrouve un rôle "stylé" sur le serveur (par ID mémorisé, sinon par nom). */
+function findStyledRole(guild, entry) {
+  if (entry.id) {
+    const byId = guild.roles.cache.get(entry.id);
+    if (byId) return byId;
+  }
+  const wanted = simplifyRoleName(entry.name);
+  return guild.roles.cache.find(
+    (r) => r.id !== guild.id && !r.managed && simplifyRoleName(r.name) === wanted
+  ) || null;
+}
+
+/** Comme findStyledRole, mais crée le rôle s'il est marqué "creatable". */
+async function ensureStyledRole(guild, entry) {
+  let role = findStyledRole(guild, entry);
+  let created = false;
+  if (role && entry.id !== role.id) entry.id = role.id;
+  if (!role && entry.creatable) {
+    role = await guild.roles.create({
+      name: entry.name,
+      color: hexToInt(entry.color),
+      hoist: entry.hoist,
+      mentionable: false,
+      permissions: [],
+      reason: 'Créé depuis le dashboard Virality (construction du serveur)',
+    });
+    created = true;
+    entry.id = role.id;
+    if (entry.emoji) await role.edit({ unicodeEmoji: entry.emoji }).catch(() => {});
+  }
+  return { role, created };
+}
+
+/** Permissions de chaque catégorie (le cœur du "plan" du serveur). */
+function overwritesForCategory(clé, ctx) {
+  const F = PermissionFlagsBits;
+  const everyoneId = ctx.guild.id;
+  const botOw = {
+    id: ctx.me.id,
+    allow: [
+      F.ViewChannel, F.SendMessages, F.ReadMessageHistory,
+      F.EmbedLinks, F.AttachFiles, F.ManageMessages, F.ManageChannels,
+    ],
+  };
+  const staffOws = ctx.staffRoles.map((r) => ({
+    id: r.id,
+    allow: [F.ViewChannel, F.SendMessages, F.ReadMessageHistory, F.ManageMessages],
+  }));
+
+  // 📌 Informations : tout le monde LIT, seuls le staff et le bot ÉCRIVENT
+  if (clé === 'informations') {
+    return [
+      { id: everyoneId, allow: [F.ViewChannel, F.ReadMessageHistory, F.AddReactions], deny: [F.SendMessages] },
+      botOw,
+      ...staffOws,
+    ];
+  }
+
+  // 💬 Communauté : tout le monde voit et participe
+  if (clé === 'communaute') {
+    return [
+      {
+        id: everyoneId,
+        allow: [F.ViewChannel, F.SendMessages, F.ReadMessageHistory, F.AddReactions, F.EmbedLinks, F.AttachFiles],
+      },
+      botOw,
+      ...staffOws,
+    ];
+  }
+
+  // 🔒 Espace Clipper (privé) :
+  //  - @everyone (et donc Accueil) : invisible
+  //  - Membre : voit les Salons et peut écrire, MAIS pas l'Historique passé
+  //  - Clipper : tout voit, Historique compris
+  //  - Staff + bot : accès complet
+  const ows = [
+    { id: everyoneId, deny: [F.ViewChannel] },
+    botOw,
+    ...staffOws,
+  ];
+  if (ctx.membreRole) {
+    ows.push({
+      id: ctx.membreRole.id,
+      allow: [F.ViewChannel, F.SendMessages, F.AddReactions],
+      deny: [F.ReadMessageHistory],
+    });
+  }
+  if (ctx.clipperRole) {
+    ows.push({
+      id: ctx.clipperRole.id,
+      allow: [F.ViewChannel, F.SendMessages, F.ReadMessageHistory, F.AddReactions, F.EmbedLinks, F.AttachFiles],
+    });
+  }
+  return ows;
+}
+
+/**
+ * Construit (ou remet en forme) toute la structure du serveur :
+ * catégories, Salons, descriptions et permissions, selon config.serverStructure.
+ * Sûr par conception : ne SUPPRIME jamais rien. Ce qui existe déjà est
+ * retrouvé par nom, déplacé au bon endroit, renommé et re-synchronisé.
+ */
+async function buildServerStructure() {
+  if (!client || !isReady) {
+    return { ok: false, reason: 'Le bot est hors ligne. Vérifie le token dans le fichier .env puis redémarre le bot.', results: [] };
+  }
+  const guild = client.guilds.cache.get(GUILD_ID);
+  if (!guild) {
+    return { ok: false, reason: 'Le bot n\'est pas sur le serveur Virality. Utilise le lien d\'invitation affiché en haut du dashboard.', results: [] };
+  }
+  const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
+  if (!me) {
+    return { ok: false, reason: 'Impossible de récupérer le membre du bot sur le serveur.', results: [] };
+  }
+
+  const missing = [];
+  if (!me.permissions.has(PermissionFlagsBits.ManageChannels)) missing.push('« Gérer les Salons »');
+  if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) missing.push('« Gérer les rôles »');
+  if (missing.length) {
+    return {
+      ok: false,
+      reason: `Il manque au bot la permission ${missing.join(' et ')}. Pour l'ajouter (10 secondes) : discord → Paramètres du serveur → Rôles → clique le rôle du bot → active ${missing.join(' et ')} → Enregistrer. Puis reclique le bouton ici.`,
+      results: [],
+    };
+  }
+
+  await guild.roles.fetch().catch(() => {});
+  await guild.channels.fetch().catch(() => {});
+
+  const cfg = getConfig();
+  const results = [];
+  let configChanged = false;
+  const entryByKey = (k) => cfg.rolesStyle.find((r) => r.key === k);
+
+  // Rôles du staff (accès partout)
+  const staffRoles = [];
+  for (const k of ['fondateur', 'gerant', 'moderateur', 'moderateur-test']) {
+    const entry = entryByKey(k);
+    if (!entry) continue;
+    const role = findStyledRole(guild, entry);
+    if (role) {
+      if (entry.id !== role.id) { entry.id = role.id; configChanged = true; }
+      staffRoles.push(role);
+    }
+  }
+
+  // Rôles Membre et Clipper : créés au besoin (requis pour les permissions)
+  let membreRole = null;
+  let clipperRole = null;
+  for (const k of ['membre', 'clipper']) {
+    const entry = entryByKey(k);
+    if (!entry) continue;
+    const before = entry.id;
+    try {
+      const { role, created } = await ensureStyledRole(guild, entry);
+      if (k === 'membre') membreRole = role;
+      else clipperRole = role;
+      if (created) {
+        results.push({ name: entry.name, status: 'created', message: 'Rôle créé (nécessaire pour les permissions de l\'Espace Clipper) ✨' });
+      }
+      if (entry.id !== before) configChanged = true;
+    } catch (err) {
+      results.push({ name: entry.name, status: 'error', message: `Création du rôle impossible : ${err.message}` });
+    }
+  }
+
+  const ctx = { guild, me, staffRoles, membreRole, clipperRole };
+  const usedChannelIds = new Set();
+  let bienvenueChannel = null;
+  const isTextual = (c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement;
+
+  for (const catDef of cfg.serverStructure.categories) {
+    try {
+      const overwrites = overwritesForCategory(catDef.key, ctx);
+      let category = guild.channels.cache.find(
+        (c) => c.type === ChannelType.GuildCategory && matchesName(c.name, catDef.key, CATEGORY_ALIASES, catDef.name)
+      );
+      let catCreated = false;
+      if (!category) {
+        category = await guild.channels.create({
+          name: catDef.name,
+          type: ChannelType.GuildCategory,
+          permissionOverwrites: overwrites,
+          reason: 'Construction du serveur depuis le dashboard Virality',
+        });
+        catCreated = true;
+      } else {
+        await category.edit({
+          name: catDef.name,
+          permissionOverwrites: overwrites,
+          reason: 'Remise en forme depuis le dashboard Virality',
+        });
+      }
+      results.push({
+        name: catDef.name,
+        status: catCreated ? 'created' : 'updated',
+        message: catCreated ? 'Catégorie créée ✨' : 'Catégorie remise en forme (nom + permissions) ✅',
+      });
+
+      for (const chDef of catDef.channels) {
+        try {
+          // 1) déjà dans cette catégorie ? 2) ailleurs sur le serveur ?
+          let channel = guild.channels.cache.find(
+            (c) => isTextual(c) && !usedChannelIds.has(c.id) && c.parentId === category.id
+              && matchesName(c.name, chDef.key, CHANNEL_ALIASES, chDef.name)
+          ) || guild.channels.cache.find(
+            (c) => isTextual(c) && !usedChannelIds.has(c.id)
+              && matchesName(c.name, chDef.key, CHANNEL_ALIASES, chDef.name)
+          );
+
+          let created = false;
+          if (!channel) {
+            channel = await guild.channels.create({
+              name: chDef.name,
+              type: ChannelType.GuildText,
+              parent: category.id,
+              topic: chDef.topic || undefined,
+              reason: 'Construction du serveur depuis le dashboard Virality',
+            });
+            created = true;
+          } else {
+            if (channel.parentId !== category.id) {
+              await channel.setParent(category.id, { lockPermissions: true });
+            } else if (typeof channel.lockPermissions === 'function') {
+              await channel.lockPermissions().catch(() => {});
+            }
+            if (channel.name !== chDef.name) await channel.setName(chDef.name).catch(() => {});
+            if (chDef.topic && channel.topic !== chDef.topic && typeof channel.setTopic === 'function') {
+              await channel.setTopic(chDef.topic).catch(() => {});
+            }
+          }
+
+          usedChannelIds.add(channel.id);
+          if (chDef.key === 'bienvenue') bienvenueChannel = channel;
+          results.push({
+            name: `#${chDef.name}`,
+            status: created ? 'created' : 'updated',
+            message: created ? 'Salon créé dans la catégorie ✨' : 'Salon rangé au bon endroit, renommé, permissions synchronisées ✅',
+          });
+        } catch (err) {
+          results.push({ name: `#${chDef.name}`, status: 'error', message: `Erreur discord : ${err.message}` });
+        }
+      }
+    } catch (err) {
+      results.push({ name: catDef.name, status: 'error', message: `Erreur discord : ${err.message}` });
+    }
+  }
+
+  // Relie automatiquement le salon de bienvenue si ce n'est pas déjà fait
+  if (bienvenueChannel && !cfg.welcome.channelId) {
+    cfg.welcome.channelId = bienvenueChannel.id;
+    configChanged = true;
+    results.push({
+      name: 'Salon de bienvenue',
+      status: 'updated',
+      message: 'Relié automatiquement au système de bienvenue 👋 (vérifie dans l\'onglet Bienvenue)',
+    });
+  }
+
+  if (configChanged) saveConfig();
+  return { ok: results.some((r) => r.status !== 'error'), results, config: getConfig() };
+}
+
+module.exports = { startBot, getGuildInfo, sendTestWelcome, applyRolesStyle, buildServerStructure, GUILD_ID };

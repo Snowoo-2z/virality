@@ -120,7 +120,55 @@ const DEFAULTS = {
       hoist: false,
       creatable: true,
     },
+    {
+      key: 'clipper',
+      label: 'Clipper (nouveau rôle, créé au clic)',
+      id: '',
+      name: '🎬・Clipper',
+      color: '#FF7B1C',
+      emoji: '🎬',
+      hoist: true,
+      creatable: true,
+    },
   ],
+
+  /**
+   * Plan du serveur, construit en 1 clic depuis le dashboard
+   * (catégories + Salons + permissions). Les noms sont modifiables
+   * dans le dashboard ; les permissions sont gérées par le bot
+   * selon la clé de chaque catégorie (voir bot.js).
+   */
+  serverStructure: {
+    categories: [
+      {
+        key: 'informations',
+        name: '📌・Informations',
+        channels: [
+          { key: 'annonces', name: '📢・annonces', topic: 'Les annonces officielles de Virality 📢 — active la cloche pour ne rien rater !' },
+          { key: 'bienvenue', name: '👋・bienvenue', topic: 'Souhaitez la bienvenue aux nouveaux membres de la communauté 🔥' },
+          { key: 'a-propos', name: '📖・à-propos', topic: 'Virality, c\'est quoi ? Comment gagner de l\'argent avec le clipping : tout est expliqué ici 📖' },
+        ],
+      },
+      {
+        key: 'communaute',
+        name: '💬・Communauté',
+        channels: [
+          { key: 'success-flex', name: '🏆・success-flex', topic: 'FLEX tes résultats, tes vues et tes victoires ici 🏆🔥' },
+          { key: 'proof', name: '💸・proof', topic: 'Les preuves de gains de la communauté 💸 — du concret, que du concret.' },
+          { key: 'tickets', name: '🎫・tickets', topic: 'Un souci, une question ? C\'est ici que ça se passe, l\'équipe te répond 🎫' },
+        ],
+      },
+      {
+        key: 'clipper',
+        name: '🔒・Espace Clipper',
+        channels: [
+          { key: 'commandes', name: '🛒・commandes', topic: 'Les commandes de clips passent ici 🎬' },
+          { key: 'discussion', name: '💬・discussion', topic: 'Discussion entre clippers : entraide, astuces, retours 💬' },
+          { key: 'bonus', name: '🎁・bonus', topic: 'Bonus, récompenses et avantages réservés aux clippers 🎁' },
+        ],
+      },
+    ],
+  },
 };
 
 function deepMerge(target, source) {
@@ -183,6 +231,31 @@ function normalizeRolesStyle(input) {
   });
 }
 
+/** Reconstruit proprement le plan du serveur (par clé de catégorie/salon). */
+function normalizeServerStructure(input) {
+  const fromUser = input && Array.isArray(input.categories) ? input.categories : [];
+  return {
+    categories: DEFAULTS.serverStructure.categories.map((defCat) => {
+      const savedCat = fromUser.find((c) => c && c.key === defCat.key) || {};
+      const savedChannels = Array.isArray(savedCat.channels) ? savedCat.channels : [];
+      const catName = String(savedCat.name ?? defCat.name).trim().slice(0, 100);
+      return {
+        key: defCat.key,
+        name: catName || defCat.name,
+        channels: defCat.channels.map((defCh) => {
+          const savedCh = savedChannels.find((c) => c && c.key === defCh.key) || {};
+          const chName = String(savedCh.name ?? defCh.name).trim().slice(0, 100);
+          return {
+            key: defCh.key,
+            name: chName || defCh.name,
+            topic: String(savedCh.topic ?? defCh.topic).slice(0, 1024),
+          };
+        }),
+      };
+    }),
+  };
+}
+
 /** Nettoie/valide une config complète (utilisée par le dashboard web). */
 function normalizeConfig(input) {
   const base = structuredClone(DEFAULTS);
@@ -209,6 +282,7 @@ function normalizeConfig(input) {
     : 0;
 
   merged.rolesStyle = normalizeRolesStyle(merged.rolesStyle);
+  merged.serverStructure = normalizeServerStructure(merged.serverStructure);
   return merged;
 }
 
@@ -227,12 +301,24 @@ function getConfig() {
   return current;
 }
 
+/** Vrai si un fichier de config local existe déjà (utilisé au démarrage). */
+function hasLocalConfig() {
+  return fs.existsSync(CONFIG_PATH);
+}
+
 function saveConfig() {
   try {
     fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(current, null, 2), 'utf8');
   } catch (err) {
     console.error('❌ Impossible de sauvegarder la configuration :', err.message);
+  }
+  // Miroir de sauvegarde sur Supabase (si configuré dans le .env) :
+  // en arrière-plan, sans jamais bloquer le bot en cas de souci réseau.
+  try {
+    require('./supabase').queuePush(current);
+  } catch {
+    /* Supabase est optionnel : on ignore silencieusement */
   }
   return current;
 }
@@ -249,6 +335,7 @@ module.exports = {
   saveConfig,
   replaceConfig,
   normalizeConfig,
+  hasLocalConfig,
   isValidColor,
   normalizeColor,
 };

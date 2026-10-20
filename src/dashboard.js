@@ -127,6 +127,21 @@ function startDashboard() {
     res.json({ ok: true, results: result.results, config: result.config });
   });
 
+  // Construit / remet en forme toute la structure du serveur (catégories + Salons)
+  app.post('/api/server/build', requireAuthApi, async (req, res) => {
+    const result = await bot.buildServerStructure();
+    if (!result.ok && result.reason) return res.status(400).json({ error: result.reason });
+    res.json({ ok: true, results: result.results, config: result.config });
+  });
+
+  // État du système (sauvegarde locale + miroir Supabase) pour l'onglet Serveur
+  app.get('/api/system', requireAuthApi, (req, res) => {
+    res.json({
+      supabase: require('./supabase').status(),
+      guildId: bot.GUILD_ID,
+    });
+  });
+
   app.listen(port, '0.0.0.0', () => {
     console.log('');
     console.log('🖥️  DASHBOARD WEB PRÊT');

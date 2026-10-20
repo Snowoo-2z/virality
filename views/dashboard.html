@@ -36,223 +36,266 @@
       <div style="margin-top:10px"><a class="btn btn-primary btn-sm" id="inviteLink" href="#" target="_blank" rel="noopener">➕ Inviter le bot sur le serveur Virality</a></div>
     </div>
 
-    <div class="layout">
-      <!-- ============ COLONNE FORMULAIRE ============ -->
-      <div>
-        <!-- Général -->
-        <section class="card">
-          <h2>⚙️ Général — Bienvenue</h2>
-          <p class="desc">Le message envoyé quand un nouveau membre rejoint le serveur.</p>
+    <!-- ============ NAVIGATION PAR ONGLETS ============ -->
+    <nav class="tabs" id="mainTabs">
+      <button class="tab-btn active" data-panel="bienvenue">👋 Bienvenue</button>
+      <button class="tab-btn" data-panel="roles">🎨 Rôles du serveur</button>
+      <button class="tab-btn" data-panel="serveur">🏗️ Structure &amp; sauvegarde</button>
+    </nav>
 
-          <div class="switch-row">
-            <div class="txt"><b>Système de bienvenue</b><span>Activer ou couper complètement les messages de bienvenue</span></div>
-            <label class="switch"><input type="checkbox" data-bind="welcome.enabled" /><span class="track"></span></label>
-          </div>
+    <!-- ============ ONGLET : BIENVENUE ============ -->
+    <section class="tab-panel" id="tab-bienvenue">
+      <div class="layout">
+        <!-- Colonne formulaire -->
+        <div>
+          <!-- Général -->
+          <section class="card">
+            <h2>⚙️ Général — Bienvenue</h2>
+            <p class="desc">Le message envoyé quand un nouveau membre rejoint le serveur.</p>
 
-          <label class="field-label" for="channelSelect">Salon de bienvenue</label>
-          <select id="channelSelect"></select>
-          <label class="field-label" for="channelIdInput">...ou colle l'ID du salon à la main</label>
-          <input type="text" id="channelIdInput" data-bind="welcome.channelId" placeholder="Ex : 123456789012345678" />
-          <p class="hint">Astuce ID : dans discord, active le « Mode développeur » (Paramètres → Avancés), puis clic droit sur un salon → « Copier l'identifiant ».</p>
+            <div class="switch-row">
+              <div class="txt"><b>Système de bienvenue</b><span>Activer ou couper complètement les messages de bienvenue</span></div>
+              <label class="switch"><input type="checkbox" data-bind="welcome.enabled" /><span class="track"></span></label>
+            </div>
 
-          <div class="grid-2">
-            <div>
-              <label class="field-label">Format du message</label>
-              <select data-bind="welcome.type">
+            <label class="field-label" for="channelSelect">Salon de bienvenue</label>
+            <select id="channelSelect"></select>
+            <label class="field-label" for="channelIdInput">...ou colle l'ID du salon à la main</label>
+            <input type="text" id="channelIdInput" data-bind="welcome.channelId" placeholder="Ex : 123456789012345678" />
+            <p class="hint">Astuce ID : dans discord, active le « Mode développeur » (Paramètres → Avancés), puis clic droit sur un salon → « Copier l'identifiant ».</p>
+
+            <div class="grid-2">
+              <div>
+                <label class="field-label">Format du message</label>
+                <select data-bind="welcome.type">
+                  <option value="embed">Embed (joli encadré coloré)</option>
+                  <option value="texte">Texte simple</option>
+                </select>
+              </div>
+              <div>
+                <div class="switch-row" style="margin-top:34px">
+                  <div class="txt"><b>Mentionner le membre</b><span>Lui envoyer une notification (@)</span></div>
+                  <label class="switch"><input type="checkbox" data-bind="welcome.pingUser" /><span class="track"></span></label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Embed salon -->
+          <section class="card" data-show-when="welcome.type=embed">
+            <h2>🎨 Embed affiché dans le salon</h2>
+            <p class="desc">L'encadré coloré. Laisse un champ vide pour ne pas l'afficher.</p>
+
+            <label class="field-label">Titre</label>
+            <input type="text" data-bind="welcome.embed.title" maxlength="256" placeholder="🔥 Bienvenue sur {server} !" />
+
+            <label class="field-label">Description (texte principal)</label>
+            <textarea data-bind="welcome.embed.description" maxlength="4000" placeholder="Salut {user}, bienvenue..."></textarea>
+            <p class="hint">Tu peux utiliser <code>**gras**</code>, <code>*italique*</code> et les variables ci-dessous.</p>
+
+            <label class="field-label">Petit texte en bas (footer)</label>
+            <input type="text" data-bind="welcome.embed.footer" maxlength="2048" placeholder="Virality • Membre n°{memberCount}" />
+
+            <div class="grid-2">
+              <div>
+                <label class="field-label">Couleur de la bordure</label>
+                <div class="color-row">
+                  <input type="color" data-bind="welcome.embed.color" />
+                  <input type="text" data-bind="welcome.embed.color" placeholder="#FF6A00" />
+                </div>
+              </div>
+              <div>
+                <label class="field-label">Miniature (petite image en haut à droite)</label>
+                <select data-bind="welcome.embed.thumbnail">
+                  <option value="avatar">Avatar du nouveau membre</option>
+                  <option value="logo">Logo Virality</option>
+                  <option value="aucune">Aucune</option>
+                </select>
+              </div>
+            </div>
+
+            <label class="field-label">Grande image</label>
+            <select data-bind="welcome.embed.imageMode">
+              <option value="banniere">Bannière Virality (incluse)</option>
+              <option value="aucune">Aucune</option>
+              <option value="url">Image personnalisée (lien URL)</option>
+            </select>
+
+            <label class="field-label">URL de l'image personnalisée (si « Image personnalisée »)</label>
+            <input type="url" data-bind="welcome.embed.imageUrl" placeholder="https://exemple.com/mon-image.png" />
+          </section>
+
+          <!-- Texte salon -->
+          <section class="card" data-show-when="welcome.type=texte">
+            <h2>💬 Message texte dans le salon</h2>
+            <p class="desc">Utilisé quand le format est réglé sur « Texte simple ».</p>
+            <label class="field-label">Message</label>
+            <textarea data-bind="welcome.texteMessage" maxlength="2000" placeholder="🔥 Bienvenue {user} sur **{server}** !"></textarea>
+          </section>
+
+          <!-- Message privé -->
+          <section class="card">
+            <h2>📩 Message privé de bienvenue</h2>
+            <p class="desc">Un message envoyé en privé (MP) au nouveau membre, en plus du salon. Ne marche que si la personne accepte les MP du serveur.</p>
+
+            <div class="switch-row">
+              <div class="txt"><b>Envoyer un MP de bienvenue</b><span>Message privé automatique aux nouveaux membres</span></div>
+              <label class="switch"><input type="checkbox" data-bind="welcome.dm.enabled" /><span class="track"></span></label>
+            </div>
+
+            <div data-show-when="welcome.dm.enabled=true">
+              <label class="field-label">Format du MP</label>
+              <select data-bind="welcome.dm.type">
                 <option value="embed">Embed (joli encadré coloré)</option>
                 <option value="texte">Texte simple</option>
               </select>
-            </div>
-            <div>
-              <div class="switch-row" style="margin-top:34px">
-                <div class="txt"><b>Mentionner le membre</b><span>Lui envoyer une notification (@)</span></div>
-                <label class="switch"><input type="checkbox" data-bind="welcome.pingUser" /><span class="track"></span></label>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <!-- Embed salon -->
-        <section class="card" data-show-when="welcome.type=embed">
-          <h2>🎨 Embed affiché dans le salon</h2>
-          <p class="desc">L'encadré coloré. Laisse un champ vide pour ne pas l'afficher.</p>
-
-          <label class="field-label">Titre</label>
-          <input type="text" data-bind="welcome.embed.title" maxlength="256" placeholder="🔥 Bienvenue sur {server} !" />
-
-          <label class="field-label">Description (texte principal)</label>
-          <textarea data-bind="welcome.embed.description" maxlength="4000" placeholder="Salut {user}, bienvenue..."></textarea>
-          <p class="hint">Tu peux utiliser <code>**gras**</code>, <code>*italique*</code> et les variables ci-dessous.</p>
-
-          <label class="field-label">Petit texte en bas (footer)</label>
-          <input type="text" data-bind="welcome.embed.footer" maxlength="2048" placeholder="Virality • Membre n°{memberCount}" />
-
-          <div class="grid-2">
-            <div>
-              <label class="field-label">Couleur de la bordure</label>
-              <div class="color-row">
-                <input type="color" data-bind="welcome.embed.color" />
-                <input type="text" data-bind="welcome.embed.color" placeholder="#FF6A00" />
-              </div>
-            </div>
-            <div>
-              <label class="field-label">Miniature (petite image en haut à droite)</label>
-              <select data-bind="welcome.embed.thumbnail">
-                <option value="avatar">Avatar du nouveau membre</option>
-                <option value="logo">Logo Virality</option>
-                <option value="aucune">Aucune</option>
-              </select>
-            </div>
-          </div>
-
-          <label class="field-label">Grande image</label>
-          <select data-bind="welcome.embed.imageMode">
-            <option value="banniere">Bannière Virality (incluse)</option>
-            <option value="aucune">Aucune</option>
-            <option value="url">Image personnalisée (lien URL)</option>
-          </select>
-
-          <label class="field-label">URL de l'image personnalisée (si « Image personnalisée »)</label>
-          <input type="url" data-bind="welcome.embed.imageUrl" placeholder="https://exemple.com/mon-image.png" />
-        </section>
-
-        <!-- Texte salon -->
-        <section class="card" data-show-when="welcome.type=texte">
-          <h2>💬 Message texte dans le salon</h2>
-          <p class="desc">Utilisé quand le format est réglé sur « Texte simple ».</p>
-          <label class="field-label">Message</label>
-          <textarea data-bind="welcome.texteMessage" maxlength="2000" placeholder="🔥 Bienvenue {user} sur **{server}** !"></textarea>
-        </section>
-
-        <!-- Message privé -->
-        <section class="card">
-          <h2>📩 Message privé de bienvenue</h2>
-          <p class="desc">Un message envoyé en privé (MP) au nouveau membre, en plus du salon. Ne marche que si la personne accepte les MP du serveur.</p>
-
-          <div class="switch-row">
-            <div class="txt"><b>Envoyer un MP de bienvenue</b><span>Message privé automatique aux nouveaux membres</span></div>
-            <label class="switch"><input type="checkbox" data-bind="welcome.dm.enabled" /><span class="track"></span></label>
-          </div>
-
-          <div data-show-when="welcome.dm.enabled=true">
-            <label class="field-label">Format du MP</label>
-            <select data-bind="welcome.dm.type">
-              <option value="embed">Embed (joli encadré coloré)</option>
-              <option value="texte">Texte simple</option>
-            </select>
-
-            <div data-show-when="welcome.dm.type=embed">
-              <label class="field-label">Titre</label>
-              <input type="text" data-bind="welcome.dm.embed.title" maxlength="256" />
-              <label class="field-label">Description</label>
-              <textarea data-bind="welcome.dm.embed.description" maxlength="4000"></textarea>
-              <label class="field-label">Petit texte en bas (footer)</label>
-              <input type="text" data-bind="welcome.dm.embed.footer" maxlength="2048" />
-              <div class="grid-2">
-                <div>
-                  <label class="field-label">Couleur de la bordure</label>
-                  <div class="color-row">
-                    <input type="color" data-bind="welcome.dm.embed.color" />
-                    <input type="text" data-bind="welcome.dm.embed.color" placeholder="#FF6A00" />
+              <div data-show-when="welcome.dm.type=embed">
+                <label class="field-label">Titre</label>
+                <input type="text" data-bind="welcome.dm.embed.title" maxlength="256" />
+                <label class="field-label">Description</label>
+                <textarea data-bind="welcome.dm.embed.description" maxlength="4000"></textarea>
+                <label class="field-label">Petit texte en bas (footer)</label>
+                <input type="text" data-bind="welcome.dm.embed.footer" maxlength="2048" />
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Couleur de la bordure</label>
+                    <div class="color-row">
+                      <input type="color" data-bind="welcome.dm.embed.color" />
+                      <input type="text" data-bind="welcome.dm.embed.color" placeholder="#FF6A00" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Miniature</label>
+                    <select data-bind="welcome.dm.embed.thumbnail">
+                      <option value="logo">Logo Virality</option>
+                      <option value="avatar">Avatar du nouveau membre</option>
+                      <option value="aucune">Aucune</option>
+                    </select>
                   </div>
                 </div>
-                <div>
-                  <label class="field-label">Miniature</label>
-                  <select data-bind="welcome.dm.embed.thumbnail">
-                    <option value="logo">Logo Virality</option>
-                    <option value="avatar">Avatar du nouveau membre</option>
-                    <option value="aucune">Aucune</option>
-                  </select>
-                </div>
+                <label class="field-label">Grande image</label>
+                <select data-bind="welcome.dm.embed.imageMode">
+                  <option value="banniere">Bannière Virality (incluse)</option>
+                  <option value="aucune">Aucune</option>
+                  <option value="url">Image personnalisée (lien URL)</option>
+                </select>
+                <label class="field-label">URL de l'image personnalisée</label>
+                <input type="url" data-bind="welcome.dm.embed.imageUrl" placeholder="https://exemple.com/mon-image.png" />
               </div>
-              <label class="field-label">Grande image</label>
-              <select data-bind="welcome.dm.embed.imageMode">
-                <option value="banniere">Bannière Virality (incluse)</option>
-                <option value="aucune">Aucune</option>
-                <option value="url">Image personnalisée (lien URL)</option>
-              </select>
-              <label class="field-label">URL de l'image personnalisée</label>
-              <input type="url" data-bind="welcome.dm.embed.imageUrl" placeholder="https://exemple.com/mon-image.png" />
+
+              <div data-show-when="welcome.dm.type=texte">
+                <label class="field-label">Message texte du MP</label>
+                <textarea data-bind="welcome.dm.texteMessage" maxlength="2000"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- Rôle automatique -->
+          <section class="card">
+            <h2>🏷️ Rôle automatique</h2>
+            <p class="desc">Donne automatiquement un rôle à chaque nouveau membre (ex : « Membre »).
+              ⚠️ Dans les paramètres du serveur → Rôles, le rôle du bot doit être placé <b>au-dessus</b> du rôle à donner.</p>
+
+            <div class="switch-row">
+              <div class="txt"><b>Rôle automatique</b><span>Attribuer un rôle à l'arrivée</span></div>
+              <label class="switch"><input type="checkbox" data-bind="welcome.autoRole.enabled" /><span class="track"></span></label>
             </div>
 
-            <div data-show-when="welcome.dm.type=texte">
-              <label class="field-label">Message texte du MP</label>
-              <textarea data-bind="welcome.dm.texteMessage" maxlength="2000"></textarea>
+            <div data-show-when="welcome.autoRole.enabled=true">
+              <label class="field-label" for="roleSelect">Rôle à donner</label>
+              <select id="roleSelect"></select>
+              <label class="field-label">...ou colle l'ID du rôle à la main</label>
+              <input type="text" data-bind="welcome.autoRole.roleId" placeholder="Ex : 123456789012345678" />
+              <label class="field-label">Délai avant de donner le rôle (en secondes, 0 = tout de suite)</label>
+              <input type="number" data-bind="welcome.autoRole.delaySeconds" min="0" max="3600" />
             </div>
+          </section>
+
+          <!-- Variables -->
+          <section class="card">
+            <h2>🧩 Variables utilisables dans les textes</h2>
+            <p class="desc">Écris-les telles quelles dans tes textes : le bot les remplacera automatiquement pour chaque nouveau membre.</p>
+            <div class="vars">
+              <span class="var-chip"><code>{user}</code> mentionne le membre (@Pseudo)</span>
+              <span class="var-chip"><code>{username}</code> pseudo sans mention</span>
+              <span class="var-chip"><code>{server}</code> nom du serveur</span>
+              <span class="var-chip"><code>{memberCount}</code> nombre de membres</span>
+            </div>
+          </section>
+
+          <div class="actions-bar">
+            <button class="btn btn-primary" id="saveBtn">💾 Enregistrer la configuration</button>
+            <button class="btn btn-ghost" id="testBtn">📨 Enregistrer + envoyer un test sur discord</button>
           </div>
-        </section>
-
-        <!-- Rôle automatique -->
-        <section class="card">
-          <h2>🏷️ Rôle automatique</h2>
-          <p class="desc">Donne automatiquement un rôle à chaque nouveau membre (ex : « Membre »).
-            ⚠️ Dans les paramètres du serveur → Rôles, le rôle du bot doit être placé <b>au-dessus</b> du rôle à donner.</p>
-
-          <div class="switch-row">
-            <div class="txt"><b>Rôle automatique</b><span>Attribuer un rôle à l'arrivée</span></div>
-            <label class="switch"><input type="checkbox" data-bind="welcome.autoRole.enabled" /><span class="track"></span></label>
-          </div>
-
-          <div data-show-when="welcome.autoRole.enabled=true">
-            <label class="field-label" for="roleSelect">Rôle à donner</label>
-            <select id="roleSelect"></select>
-            <label class="field-label">...ou colle l'ID du rôle à la main</label>
-            <input type="text" data-bind="welcome.autoRole.roleId" placeholder="Ex : 123456789012345678" />
-            <label class="field-label">Délai avant de donner le rôle (en secondes, 0 = tout de suite)</label>
-            <input type="number" data-bind="welcome.autoRole.delaySeconds" min="0" max="3600" />
-          </div>
-        </section>
-
-        <!-- Rôles du serveur -->
-        <section class="card">
-          <h2>🎨 Rôles du serveur — style en 1 clic</h2>
-          <p class="desc">En un seul clic, le bot renomme et recolore les rôles du staff aux couleurs 🔥 de Virality,
-            les affiche séparément dans la liste des membres, et crée les rôles <b>Accueil</b> et <b>Membre</b> s'ils n'existent pas encore.
-            Tu peux ajuster les noms et les couleurs ci-dessous avant de cliquer (pense à « 💾 Enregistrer » ou laisse le bouton orange tout faire).
-            <b>Les permissions des rôles ne changent pas.</b></p>
-
-          <div id="rolesList"></div>
-
-          <p class="hint">⚠️ discord interdit au bot de modifier un rôle placé <b>au-dessus</b> du sien.
-            Si un rôle refuse : dans discord → Paramètres du serveur → <b>Rôles</b> → glisse le rôle du bot au-dessus des rôles du staff, puis reclique ici.</p>
-
-          <div style="margin-top:16px">
-            <button class="btn btn-primary" id="applyRolesBtn">🎨 Enregistrer + appliquer le style aux rôles</button>
-          </div>
-          <div id="rolesResult"></div>
-        </section>
-
-        <!-- Variables -->
-        <section class="card">
-          <h2>🧩 Variables utilisables dans les textes</h2>
-          <p class="desc">Écris-les telles quelles dans tes textes : le bot les remplacera automatiquement pour chaque nouveau membre.</p>
-          <div class="vars">
-            <span class="var-chip"><code>{user}</code> mentionne le membre (@Pseudo)</span>
-            <span class="var-chip"><code>{username}</code> pseudo sans mention</span>
-            <span class="var-chip"><code>{server}</code> nom du serveur</span>
-            <span class="var-chip"><code>{memberCount}</code> nombre de membres</span>
-          </div>
-        </section>
-
-        <div class="actions-bar">
-          <button class="btn btn-primary" id="saveBtn">💾 Enregistrer la configuration</button>
-          <button class="btn btn-ghost" id="testBtn">📨 Enregistrer + envoyer un test sur discord</button>
         </div>
+
+        <!-- Colonne aperçu -->
+        <aside class="preview-col">
+          <div class="card" style="padding:18px">
+            <h2 style="margin-bottom:12px">👀 Aperçu en direct</h2>
+            <div class="preview-tabs">
+              <button data-tab="channel" class="active">Dans le salon</button>
+              <button data-tab="dm">Message privé</button>
+            </div>
+            <div class="discord-window" id="preview"></div>
+            <p class="hint" style="margin-top:12px">Aperçu avec un faux membre « NouveauMembre ». Le vrai rendu dans discord peut très légèrement différer.</p>
+          </div>
+        </aside>
       </div>
+    </section>
 
-      <!-- ============ COLONNE APERÇU ============ -->
-      <aside class="preview-col">
-        <div class="card" style="padding:18px">
-          <h2 style="margin-bottom:12px">👀 Aperçu en direct</h2>
-          <div class="preview-tabs">
-            <button data-tab="channel" class="active">Dans le salon</button>
-            <button data-tab="dm">Message privé</button>
-          </div>
-          <div class="discord-window" id="preview"></div>
-          <p class="hint" style="margin-top:12px">Aperçu avec un faux membre « NouveauMembre ». Le vrai rendu dans discord peut très légèrement différer.</p>
+    <!-- ============ ONGLET : RÔLES ============ -->
+    <section class="tab-panel" id="tab-roles" style="display:none">
+      <section class="card">
+        <h2>🎨 Rôles du serveur — style en 1 clic</h2>
+        <p class="desc">En un seul clic, le bot renomme et recolore les rôles du staff aux couleurs 🔥 de Virality,
+          les affiche séparément dans la liste des membres, et crée les rôles <b>Accueil</b>, <b>Membre</b> et <b>Clipper</b> s'ils n'existent pas encore.
+          Tu peux ajuster les noms et les couleurs ci-dessous avant de cliquer.
+          <b>Les permissions des rôles ne changent pas.</b></p>
+
+        <div id="rolesList"></div>
+
+        <p class="hint">⚠️ discord interdit au bot de modifier un rôle placé <b>au-dessus</b> du sien.
+          Si un rôle refuse : dans discord → Paramètres du serveur → <b>Rôles</b> → glisse le rôle du bot au-dessus des rôles du staff, puis reclique ici.</p>
+
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" id="applyRolesBtn">🎨 Enregistrer + appliquer le style aux rôles</button>
         </div>
-      </aside>
-    </div>
+        <div id="rolesResult"></div>
+      </section>
+    </section>
+
+    <!-- ============ ONGLET : STRUCTURE & SAUVEGARDE ============ -->
+    <section class="tab-panel" id="tab-serveur" style="display:none">
+      <section class="card">
+        <h2>🏗️ Structure du serveur — tout construire en 1 clic</h2>
+        <p class="desc">Le bot crée (ou remet en forme) les catégories et les Salons ci-dessous, avec les bonnes permissions et de jolies descriptions.
+          <b>Il ne supprime jamais rien</b> : un salon qui existe déjà est retrouvé, rangé au bon endroit et renommé proprement.
+          Tu peux modifier les noms avant de cliquer.</p>
+
+        <div id="serverTree"></div>
+
+        <p class="hint">🔐 <b>Espace Clipper</b> : invisible pour les nouveaux (rôle Accueil). Les <b>Membres</b> voient les Salons et peuvent écrire,
+          mais <b>pas l'historique des anciens messages</b>. Les <b>Clippers</b> 🎬 (rôle créé au passage si besoin) voient tout, Historique compris.
+          Le staff et le bot ont accès complet partout. Les Salons <b>Informations</b> sont en lecture seule pour les membres (seuls le staff et le bot y écrivent).</p>
+        <p class="hint">⚠️ Le bot a besoin des permissions <b>« Gérer les Salons »</b> et <b>« Gérer les rôles »</b>.
+          Si le bouton te le signale : Paramètres du serveur → Rôles → clique le rôle du bot → active-les → Enregistrer.</p>
+
+        <div style="margin-top:16px">
+          <button class="btn btn-primary" id="buildServerBtn">🏗️ Enregistrer + construire le serveur</button>
+        </div>
+        <div id="serverResult"></div>
+      </section>
+
+      <section class="card">
+        <h2>💾 Sauvegarde de tes réglages</h2>
+        <p class="desc">Tes réglages sont toujours gardés sur ce PC, dans le fichier <code class="var">data/config.json</code>.
+          En bonus, tu peux activer une <b>copie automatique sur Supabase</b> : à chaque enregistrement, une copie part là-bas,
+          et si tu changes de PC, le bot récupère tout tout seul au démarrage.</p>
+        <div id="systemInfo">Chargement...</div>
+      </section>
+    </section>
   </main>
 
   <div class="toast" id="toast"></div>

@@ -202,6 +202,89 @@ function renderRolesResult(results) {
   ).join('') + '</div>';
 }
 
+/* ---------- Onglets du dashboard ---------- */
+function activateTab(name) {
+  $$('#mainTabs .tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.panel === name));
+  $$('.tab-panel').forEach((p) => { p.style.display = p.id === 'tab-' + name ? '' : 'none'; });
+  try { localStorage.setItem('virality-tab', name); } catch { /* navigation privée */ }
+}
+$$('#mainTabs .tab-btn').forEach((b) =>
+  b.addEventListener('click', () => activateTab(b.dataset.panel))
+);
+try {
+  const savedTab = localStorage.getItem('virality-tab');
+  if (savedTab && document.getElementById('tab-' + savedTab)) activateTab(savedTab);
+} catch { /* navigation privée */ }
+
+/* ---------- Structure du serveur (arborescence modifiable) ---------- */
+const CATEGORY_NOTES = {
+  informations: '🔒 Lecture seule pour les membres — seuls le staff et le bot écrivent.',
+  communaute: '🌍 Public — tout le monde voit les Salons et peut participer.',
+  clipper: '🔐 Privé — Membre : voit sans Historique • Clipper 🎬 : tout • Accueil : invisible.',
+};
+
+function buildServerRows() {
+  const container = $('#serverTree');
+  if (!container || !Array.isArray(config?.serverStructure?.categories)) return;
+  container.innerHTML = config.serverStructure.categories.map((cat, i) => `
+    <div class="server-cat">
+      <label class="field-label" style="margin-top:0">Catégorie</label>
+      <input type="text" class="cat-name-input" data-bind="serverStructure.categories.${i}.name" maxlength="100" />
+      <p class="hint">${CATEGORY_NOTES[cat.key] || ''}</p>
+      ${cat.channels.map((ch, j) => `
+        <div class="server-ch">
+          <span class="server-ch-hash">#</span>
+          <input type="text" data-bind="serverStructure.categories.${i}.channels.${j}.name" maxlength="100" />
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+/* Affiche une liste de résultats (✅/✨/❌) dans la boîte demandée */
+function renderResultInto(boxId, results) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  const icons = { created: '✨', updated: '✅', error: '❌' };
+  box.innerHTML = '<div class="roles-result">' + results.map((r) =>
+    `<div class="roles-result-line ${r.status}">${icons[r.status] || '•'} <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.message)}</div>`
+  ).join('') + '</div>';
+}
+
+/* ---------- Sauvegarde & système (Supabase) ---------- */
+function renderSystemInfo(sys) {
+  const box = $('#systemInfo');
+  if (!box) return;
+  const s = sys?.supabase || {};
+  if (!s.configured) {
+    box.innerHTML =
+      '<div class="system-line">☁️ <b>Supabase : non activé</b> — tes réglages sont gardés uniquement sur ce PC.</div>' +
+      '<p class="hint">Pour l\'activer : <b>1)</b> sur supabase.com, ouvre ton projet → <b>SQL Editor</b> → colle le contenu du fichier <code class="var">supabase/schema.sql</code> (dans le dossier du bot) → <b>Run</b>. ' +
+      '<b>2)</b> Ajoute ces 2 lignes dans ton fichier <code class="var">.env</code>, puis redémarre le bot :</p>' +
+      '<pre class="env-snippet">SUPABASE_URL=https://koxhyhdfsdikhundwinn.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=colle_ta_cle_service_role_ici</pre>' +
+      '<p class="hint">La clé secrète se trouve sur supabase.com → ton projet → <b>Project Settings</b> (engrenage) → <b>API Keys</b> → <b>service_role</b>. Garde-la secrète, comme ton token.</p>';
+    return;
+  }
+  let syncLine;
+  if (s.lastSyncOk === true) {
+    syncLine = `✅ Dernière copie envoyée : ${new Date(s.lastSyncAt).toLocaleString('fr-FR')}`;
+  } else if (s.lastSyncOk === false) {
+    syncLine = `❌ Dernier envoi raté : ${escapeHtml(s.lastError || 'erreur inconnue')} — vérifie la table et la clé, puis ré-enregistre un réglage.`;
+  } else {
+    syncLine = '⏳ Aucune copie envoyée depuis le démarrage (elle part automatiquement à chaque enregistrement).';
+  }
+  box.innerHTML =
+    `<div class="system-line">☁️ <b>Supabase : activé</b> — ${escapeHtml(s.url || '')}</div>` +
+    `<div class="system-line">${syncLine}</div>`;
+}
+
+async function loadSystem() {
+  try {
+    renderSystemInfo(await api('/api/system'));
+  } catch {
+    const box = $('#systemInfo');
+    if (box) box.textContent = 'Infos de sauvegarde indisponibles pour le moment.';
+  }
+}
+
 /* ---------- Statut du bot ---------- */
 function renderStatus() {
   const badge = $('#statusBadge');
@@ -330,9 +413,11 @@ async function loadAll() {
   }
   await loadGuild();
   buildRoleRows();
+  buildServerRows();
   fillForm();
   updateRoleChips();
   renderPreview();
+  loadSystem();
 }
 
 async function loadGuild() {
@@ -454,9 +539,40 @@ $('#applyRolesBtn').addEventListener('click', async () => {
   }
 });
 
+$('#buildServerBtn').addEventListener('click', async () => {
+  collectForm();
+  const btn = $('#buildServerBtn');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Construction en cours sur discord... (quelques secondes)';
+  try {
+    const saved = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
+    config = saved.config;
+    const data = await api('/api/server/build', { method: 'POST', body: '{}' });
+    if (data.config) config = data.config;
+    renderResultInto('serverResult', data.results || []);
+    await loadGuild(); // nouveaux Salons/rôles dans les listes déroulantes
+    fillForm();
+    updateRoleChips();
+    renderPreview();
+    const errorCount = (data.results || []).filter((r) => r.status === 'error').length;
+    if (errorCount > 0) {
+      showToast(`⚠️ Construction terminée avec ${errorCount} souci(s) — regarde le détail sous le bouton.`, true);
+    } else {
+      showToast('🏗️ Serveur construit ! Va admirer tes catégories et Salons sur discord 👀🔥');
+    }
+  } catch (err) {
+    showToast('❌ ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
 $('#refreshBtn').addEventListener('click', async () => {
   await loadGuild();
   renderPreview();
+  loadSystem();
   showToast('🔄 Statut, Salons et rôles actualisés.');
 });
 

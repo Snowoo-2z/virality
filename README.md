@@ -1,9 +1,15 @@
 # 🔥 Virality Bot
 
-Le bot discord officiel du serveur **Virality**. Pour le moment, il gère un **système de bienvenue entièrement configurable**, de 2 façons :
+Le bot discord officiel du serveur **Virality**. Il gère la **bienvenue**, le **style des rôles** et la **structure complète du serveur**, de 2 façons :
 
-- 🖥️ **Dashboard web** (page dans ton navigateur, protégée par mot de passe) avec aperçu en direct du message
-- 💬 **Commande `/config`** directement dans discord (boutons + menus, réservée aux administrateurs)
+- 🖥️ **Dashboard web** (page dans ton navigateur, protégée par mot de passe) organisé en 3 onglets : **👋 Bienvenue**, **🎨 Rôles du serveur**, **🏗️ Structure & sauvegarde**
+- 💬 **Commande `/config`** directement dans discord (boutons + menus, réservée aux administrateurs) pour la bienvenue
+
+### Les 3 onglets du dashboard
+
+- **👋 Bienvenue** : le message d'accueil des nouveaux membres (voir détail ci-dessous), avec aperçu en direct
+- **🎨 Rôles du serveur** : en 1 clic, renomme + recolore les rôles du staff aux couleurs Virality et crée les rôles **Accueil**, **Membre** et **Clipper** (noms/couleurs ajustables, permissions inchangées)
+- **🏗️ Structure & sauvegarde** : en 1 clic, construis tout le serveur — catégories **📌 Informations** (annonces, bienvenue, à-propos, en lecture seule), **💬 Communauté** (success-flex, proof, tickets) et **🔒 Espace Clipper** privé (commandes, discussion, bonus : les Membres voient sans l'historique, les Clippers voient tout). Le bot ne supprime jamais rien : il crée ce qui manque et range ce qui existe. C'est aussi là qu'on active la **sauvegarde automatique sur Supabase** (optionnelle) : une copie de tes réglages est envoyée à chaque enregistrement, et récupérée toute seule si tu changes de PC (voir les lignes `SUPABASE_...` dans `.env.example` et le fichier `supabase/schema.sql`)
 
 Le bot ne fonctionne **que sur le serveur Virality** (`1562033502612885534`) : si quelqu'un essaie de l'ajouter ailleurs, il quitte le serveur tout seul.
 

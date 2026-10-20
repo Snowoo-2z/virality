@@ -340,6 +340,56 @@ select:disabled, input:disabled { opacity: 0.55; }
 .roles-result-line b { color: var(--text); }
 .roles-result-line.error { color: #ffb3b3; }
 
+/* ---------- Onglets principaux ---------- */
+.tabs {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.tab-btn {
+  flex: 1; min-width: 170px;
+  padding: 13px 16px; border-radius: 12px; cursor: pointer;
+  background: var(--bg-card); color: var(--text-dim);
+  border: 1px solid var(--border);
+  font-family: inherit; font-weight: 800; font-size: 14.5px;
+  transition: border-color 0.15s, color 0.15s, filter 0.15s;
+}
+.tab-btn:hover { border-color: var(--orange); color: var(--text); }
+.tab-btn.active {
+  background: var(--orange-grad); color: #fff; border-color: transparent;
+  box-shadow: 0 8px 22px rgba(255, 106, 0, 0.30);
+}
+
+/* ---------- Structure du serveur ---------- */
+.server-cat {
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.cat-name-input { font-weight: 800; font-size: 15px; }
+.server-ch {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 8px; margin-left: 16px;
+}
+.server-ch-hash { color: var(--text-faint); font-weight: 800; font-size: 15px; }
+
+/* ---------- Sauvegarde & système ---------- */
+.system-line { font-size: 14px; line-height: 1.55; padding: 3px 0; color: var(--text-dim); }
+.system-line b { color: var(--text); }
+.env-snippet {
+  background: #0f0a06;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #ffd9ad;
+  overflow-x: auto;
+  margin-top: 8px;
+  white-space: pre;
+}
+
 /* Toast */
 .toast {
   position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 80px);
