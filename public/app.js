@@ -672,6 +672,45 @@ function renderSystemInfo(sys) {
     `<div class="system-line">${syncLine}</div>`;
 }
 
+/* ---------------- IA : liens exacts (jamais recopiés par Mistral) ---------------- */
+function buildAiExactLinks() {
+  const box = $('#aiExactLinksList');
+  if (!box || !config) return;
+  if (!Array.isArray(config.tickets.ai.exactLinks)) config.tickets.ai.exactLinks = [];
+
+  const links = config.tickets.ai.exactLinks;
+  box.innerHTML = links.map((link, i) => `
+    <div class="field-row">
+      <div class="field-row-head">
+        <span>🔗 Lien exact n°${i + 1}</span>
+        <button class="field-remove" type="button" data-remove-ai-link="${i}" title="Supprimer ce lien">❌</button>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label class="field-label">Petit code pour l'IA</label>
+          <input type="text" data-bind="tickets.ai.exactLinks.${i}.code" maxlength="40" placeholder="Ex : inscription" />
+          <p class="hint">Un seul mot simple. L'IA écrira par exemple <code class="var">{{inscription}}</code>.</p>
+        </div>
+        <div>
+          <label class="field-label">À quoi sert ce lien ?</label>
+          <input type="text" data-bind="tickets.ai.exactLinks.${i}.description" maxlength="200" placeholder="Ex : lien d'inscription des nouveaux clippers" />
+          <p class="hint">Cette phrase aide l'IA à choisir le bon lien.</p>
+        </div>
+      </div>
+      <label class="field-label">Lien exact à envoyer (colle-le en entier)</label>
+      <input type="url" data-bind="tickets.ai.exactLinks.${i}.url" maxlength="1900" placeholder="https://exemple.com/tres-long-lien..." />
+    </div>`).join('')
+    || '<p class="hint">Aucun lien exact pour le moment. Clique sur « ➕ Ajouter un lien exact » pour en mettre un.</p>';
+
+  box.querySelectorAll('[data-remove-ai-link]').forEach((btn) => btn.addEventListener('click', () => {
+    collectForm();
+    config.tickets.ai.exactLinks.splice(Number(btn.dataset.removeAiLink), 1);
+    buildAiExactLinks();
+    fillForm();
+    showToast('🗑️ Lien exact supprimé. Pense à enregistrer.');
+  }));
+}
+
 function renderAiStatus(ai) {
   const box = $('#aiStatusBox');
   if (!box) return;
@@ -844,6 +883,7 @@ async function loadAll() {
   buildServerRows();
   buildTicketForms();
   fillTicketTypeForm();
+  buildAiExactLinks();
   buildEmbedBuilder();
   fillForm();
   fillGenericSelects();
@@ -939,6 +979,7 @@ $('#saveBtn').addEventListener('click', async () => {
   try {
     const data = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
     config = data.config;
+    buildAiExactLinks();
     fillForm();
     fillTicketTypeForm();
     fillGenericSelects();
@@ -1049,6 +1090,7 @@ $('#publishPanelBtn').addEventListener('click', async () => {
     config = saved.config;
     const data = await api('/api/tickets/publish', { method: 'POST', body: '{}' });
     if (data.config) config = data.config;
+    buildAiExactLinks();
     fillForm();
     fillTicketTypeForm();
     fillGenericSelects();
@@ -1062,6 +1104,23 @@ $('#publishPanelBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = originalLabel;
   }
+});
+
+/* ---------- IA : ajouter un lien exact ---------- */
+$('#addAiExactLinkBtn').addEventListener('click', () => {
+  collectForm();
+  if (!Array.isArray(config.tickets.ai.exactLinks)) config.tickets.ai.exactLinks = [];
+  if (config.tickets.ai.exactLinks.length >= 20) {
+    showToast('Maximum 20 liens exacts — largement assez pour ne pas embrouiller l\'IA 😉', true);
+    return;
+  }
+  const n = config.tickets.ai.exactLinks.length + 1;
+  config.tickets.ai.exactLinks.push({ code: `lien_${n}`, url: '', description: '' });
+  buildAiExactLinks();
+  fillForm();
+  const urlInput = document.querySelector(`[data-bind="tickets.ai.exactLinks.${n - 1}.url"]`);
+  urlInput?.focus();
+  showToast('🔗 Nouveau lien exact ajouté : colle le lien complet, puis enregistre.');
 });
 
 /* ---------- Types de tickets (boutons) : sélection / création / suppression ---------- */

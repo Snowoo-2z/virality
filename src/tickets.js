@@ -460,11 +460,84 @@ function isStaffMember(member, cfg, type) {
   return member.roles.cache.some((r) => ids.has(r.id));
 }
 
-function aiSystemPrompt(cfg, type, meta = {}) {
-  const parts = [cfg.ai.systemPrompt];
-  if (type?.aiPrompt) {
-    parts.push(`Consignes spécifiques à ce type de ticket (« ${type.name} ») :\n${type.aiPrompt}`);
+function canonicalExactLinkCode(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function exactLinksOf(cfg) {
+  const links = Array.isArray(cfg?.ai?.exactLinks) ? cfg.ai.exactLinks : [];
+  const seen = new Set();
+  return links.filter((link) => {
+    const code = canonicalExactLinkCode(link?.code);
+    const url = String(link?.url ?? '').trim();
+    if (!code || !url || seen.has(code)) return false;
+    seen.add(code);
+    return true;
+  });
+}
+
+function exactLinkMarker(code) {
+  return `{{${canonicalExactLinkCode(code)}}}`;
+}
+
+/**
+ * Cache les vraies URL à l'IA : Mistral ne voit que des petits codes
+ * ({{inscription}}, par exemple), donc il ne peut pas déformer un lien long.
+ */
+function hideExactLinksForAi(text, cfg) {
+  let output = String(text ?? '');
+  const links = [...exactLinksOf(cfg)].sort((a, b) => b.url.length - a.url.length);
+  for (const link of links) {
+    output = output.replaceAll(link.url, exactLinkMarker(link.code));
   }
+  return output;
+}
+
+/**
+ * Remplace les codes écrits par l'IA par les URL exactes du dashboard.
+ * Le remplacement se fait après génération, caractère par caractère.
+ */
+function replaceExactLinkMarkers(text, cfg) {
+  const links = exactLinksOf(cfg);
+  if (!links.length) return String(text ?? '');
+
+  const byCode = new Map(links.map((link) => [canonicalExactLinkCode(link.code), link.url]));
+  return String(text ?? '').replace(
+    /(?:\{\{|\[\[)\s*([^\]{}]{1,60})\s*(?:\}\}|\]\])/g,
+    (_marker, rawCode) => {
+      const url = byCode.get(canonicalExactLinkCode(rawCode));
+      if (url) return url;
+      // Secours pratique : s'il n'existe qu'un seul lien exact, un code
+      // approximatif de l'IA suffit quand même à retrouver le bon lien.
+      return links.length === 1 ? links[0].url : '';
+    }
+  );
+}
+
+function exactLinksPrompt(cfg) {
+  const links = exactLinksOf(cfg);
+  if (!links.length) return '';
+
+  return [
+    'LIENS EXACTS GÉRÉS PAR LE BOT :',
+    'Tu ne dois jamais écrire, recopier, raccourcir ni inventer une adresse web complète.',
+    'Quand tu dois donner un lien, écris seulement son code ci-dessous, seul et sans markdown. Le bot remplacera automatiquement ce code par le vrai lien exact après ta réponse.',
+    ...links.map((link) => `- ${exactLinkMarker(link.code)} : ${link.description || 'lien à donner au membre quand c\'est utile'}`),
+  ].join('\n');
+}
+
+function aiSystemPrompt(cfg, type, meta = {}) {
+  const parts = [hideExactLinksForAi(cfg.ai.systemPrompt, cfg)];
+  if (type?.aiPrompt) {
+    parts.push(`Consignes spécifiques à ce type de ticket (« ${type.name} ») :\n${hideExactLinksForAi(type.aiPrompt, cfg)}`);
+  }
+  const linksPrompt = exactLinksPrompt(cfg);
+  if (linksPrompt) parts.push(linksPrompt);
   const context = [
     type ? `Type de ticket : ${type.name}.` : null,
     meta.number ? `Ticket n°${meta.number}.` : null,
@@ -480,7 +553,9 @@ function buildAiMessages({ cfg, type, meta, messages, botId }) {
     .filter((m) => (m.content || '').trim())
     .slice(-(cfg.ai.historyLimit || 12))
     .map((m) => {
-      const content = m.content.trim().slice(0, 1500);
+      // On cache les URL avant la coupe à 1500 caractères : sinon un lien
+      // long déjà envoyé serait tronqué dans la mémoire de l'IA.
+      const content = hideExactLinksForAi(m.content.trim(), cfg).slice(0, 1500);
       if (m.author?.id === botId) return { role: 'assistant', content };
       if (m.author?.id === meta.ownerId) return { role: 'user', content };
       return { role: 'user', content: `[Membre de l'équipe ${m.author?.tag || ''}] ${content}` };
@@ -488,8 +563,9 @@ function buildAiMessages({ cfg, type, meta, messages, botId }) {
   return [{ role: 'system', content: aiSystemPrompt(cfg, type, meta) }, ...history];
 }
 
-async function sendAiText(channel, text) {
-  for (const chunk of ai.splitForDiscord(text)) {
+async function sendAiText(channel, text, cfg) {
+  const exactText = replaceExactLinkMarkers(text, cfg);
+  for (const chunk of ai.splitForDiscord(exactText)) {
     await channel.send({ content: chunk, allowedMentions: { parse: [] } });
   }
 }
@@ -520,7 +596,7 @@ async function maybeAiGreeting(channel, member, { number, subject, type }) {
       },
     ],
   });
-  await sendAiText(channel, text);
+  await sendAiText(channel, text, cfg);
   aiLastReplyAt.set(channel.id, Date.now());
 }
 
@@ -593,7 +669,7 @@ async function handleMessage(message) {
         botId: message.client.user.id,
       }),
     });
-    await sendAiText(message.channel, text);
+    await sendAiText(message.channel, text, cfg);
     aiErrorNotifiedChannels.delete(channelId);
   } catch (err) {
     console.warn('⚠️  Réponse IA du ticket échouée :', err.message);
@@ -690,4 +766,8 @@ module.exports = {
   typeStaffRoleIds,
   aiSystemPrompt,
   buildAiMessages,
+  canonicalExactLinkCode,
+  exactLinksOf,
+  hideExactLinksForAi,
+  replaceExactLinkMarkers,
 };

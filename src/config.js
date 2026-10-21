@@ -258,6 +258,9 @@ const DEFAULTS = {
       maxTokens: 450,
       historyLimit: 12,
       cooldownSeconds: 5,
+      // Liens que l'IA ne doit jamais recopier elle-même : elle écrit {{code}}
+      // et le bot remplace ce code par l'URL exacte après génération.
+      exactLinks: [],
       systemPrompt:
         'Tu es l\'assistante IA du support de Virality, une communauté discord autour du clipping vidéo (TikTok, YouTube Shorts, Reels) où les membres peuvent gagner de l\'argent grâce aux vues.\n' +
         'Réponds en français, de façon chaleureuse, claire et concise (phrases courtes, quelques emojis max, jamais de pavé).\n' +
@@ -548,6 +551,56 @@ function sanitizeTicketTypeId(value, fallback) {
   return clean || fallback;
 }
 
+function normalizeExactLinkCode(value, index = 0) {
+  const clean = String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 40);
+  return clean || `lien_${index + 1}`;
+}
+
+function normalizeExactLinks(input) {
+  if (!Array.isArray(input)) return [];
+  const links = [];
+  const usedCodes = new Set();
+
+  for (const raw of input.slice(0, 20)) {
+    const item = raw && typeof raw === 'object' ? raw : {};
+    let url = String(item.url ?? '').trim().slice(0, 1900);
+    if (!url || /\s/.test(url)) continue;
+    // Confort : un lien collé sans https:// reste utilisable.
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) url = `https://${url.replace(/^\/+/, '')}`;
+
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) continue;
+    } catch {
+      continue;
+    }
+
+    let code = normalizeExactLinkCode(item.code, links.length);
+    if (usedCodes.has(code)) {
+      let suffix = 2;
+      while (usedCodes.has(`${code}_${suffix}`)) suffix += 1;
+      code = `${code}_${suffix}`;
+    }
+    usedCodes.add(code);
+
+    links.push({
+      code,
+      // On garde l'URL telle qu'elle a été collée par l'admin : aucun
+      // ré-encodage automatique, pour l'envoyer caractère par caractère.
+      url,
+      description: String(item.description ?? '').trim().slice(0, 200),
+    });
+  }
+
+  return links;
+}
+
 function normalizeTicketAi(input) {
   const def = DEFAULTS.tickets.ai;
   const a = input && typeof input === 'object' ? input : {};
@@ -574,6 +627,7 @@ function normalizeTicketAi(input) {
     maxTokens: intInRange(a.maxTokens, 50, 2000, def.maxTokens),
     historyLimit: intInRange(a.historyLimit, 2, 30, def.historyLimit),
     cooldownSeconds: intInRange(a.cooldownSeconds, 1, 120, def.cooldownSeconds),
+    exactLinks: normalizeExactLinks(a.exactLinks),
     systemPrompt: String(a.systemPrompt ?? def.systemPrompt).slice(0, 4000) || def.systemPrompt,
   };
 }

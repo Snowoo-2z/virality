@@ -124,6 +124,19 @@ function splitForDiscord(text, maxLength = 1900) {
     let cut = rest.lastIndexOf('\n', maxLength);
     if (cut < maxLength * 0.4) cut = rest.lastIndexOf(' ', maxLength);
     if (cut <= 0) cut = maxLength;
+
+    // Ne jamais couper au milieu d'une URL qui peut tenir entière dans
+    // un message : on envoie alors le texte avant le lien, puis le lien
+    // partira intact dans le morceau suivant.
+    const urlMatch = rest.match(/https?:\/\/\S+/);
+    if (urlMatch) {
+      const urlStart = urlMatch.index;
+      const urlEnd = urlStart + urlMatch[0].length;
+      if (urlStart > 0 && urlStart < cut && urlEnd > cut && urlMatch[0].length <= maxLength) {
+        cut = urlStart;
+      }
+    }
+
     chunks.push(rest.slice(0, cut).trim());
     rest = rest.slice(cut).trim();
   }

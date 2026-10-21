@@ -498,9 +498,17 @@
           </div>
         </div>
 
+        <label class="field-label">🔗 Liens exacts (l'IA ne les recopiera jamais)</label>
+        <p class="hint">Colle ici les liens longs à donner aux membres. L'IA écrira seulement un petit code comme <code class="var">{{inscription}}</code>, puis le bot le remplacera tout seul par ton lien <b>exact, caractère par caractère</b>.</p>
+        <div id="aiExactLinksList"></div>
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" id="addAiExactLinkBtn" type="button">➕ Ajouter un lien exact</button>
+        </div>
+        <p class="hint">Exemple : code <code class="var">inscription</code> + ton très long lien + description « Lien d'inscription à donner aux nouveaux clippers ». Ne mets ici que des liens destinés à être partagés aux membres concernés.</p>
+
         <label class="field-label">🧠 Consignes générales de l'IA (pour tous les tickets)</label>
         <textarea data-bind="tickets.ai.systemPrompt" maxlength="6000" rows="6" placeholder="Tu es l'assistante IA de Virality…"></textarea>
-        <p class="hint">Explique-lui son rôle, son ton, et ce qu'elle ne DOIT JAMAIS faire (inventer des prix, demander des mots de passe...). Les consignes propres à chaque bouton s'ajoutent par-dessus.</p>
+        <p class="hint">Explique-lui son rôle, son ton, et ce qu'elle ne DOIT JAMAIS faire (inventer des prix, demander des mots de passe...). Les consignes propres à chaque bouton s'ajoutent par-dessus. <b>Ne colle pas les longs liens ici</b> : mets-les dans « Liens exacts » juste au-dessus.</p>
       </section>
 
       <section class="card">

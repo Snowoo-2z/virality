@@ -92,6 +92,8 @@ Les deux modifient la **même configuration** (fichier `data/config.json`), appl
 
 Le bot utilise **Ministral 3 14B** (`ministral-14b-2512`) et espace tout seul ses appels d'un peu plus d'1 seconde pour rester sous 1 requête/seconde. Pour chaque **bouton** du panneau, tu peux dire à l'IA quoi faire (ex : pour « Commander un clip », récolter le brief complet) dans **« Consignes spéciales »** du type.
 
+**Lien long que l'IA doit envoyer ?** Ne le colle pas dans les consignes : une IA peut changer une lettre en le recopiant. Dans la section **« 🔗 Liens exacts »**, clique **« ➕ Ajouter un lien exact »**, choisis un petit code (ex : `inscription`), colle le lien complet, écris à quoi il sert, puis enregistre. L'IA écrira seulement `{{inscription}}` et le bot remplacera ce code par ton vrai lien, caractère par caractère.
+
 ---
 
 ## 🧩 Variables pour personnaliser les textes
@@ -119,6 +121,7 @@ Tu peux aussi mettre du `**gras**` et de l' `*italique*` comme dans discord.
 | Le bot est en ligne mais aucun message de bienvenue | Vérifie dans le dashboard : système **activé** + **salon choisi**. Puis teste avec le bouton « Envoyer un test ». Vérifie aussi que le bot a le droit d'écrire dans ce salon. |
 | Le rôle automatique ne se donne pas | Paramètres du serveur → **Rôles** : glisse le rôle du bot **au-dessus** du rôle à donner. discord refuse sinon. |
 | L'IA des tickets ne répond pas | Regarde l'encadré d'état dans l'onglet **🎫 Tickets** du dashboard : il te dit ce qui manque. Les 3 causes classiques : pas de clé `MISTRAL_API_KEY` dans le `.env` • **MESSAGE CONTENT INTENT** pas coché sur le portail développeur • le bot pas **redémarré** après l'activation. Et si un membre du staff a déjà répondu dans le ticket, l'IA se met en pause (c'est un réglage). |
+| L'IA envoie un lien faux ou coupé | Ne mets pas le lien dans ses consignes. Ajoute-le dans **« 🔗 Liens exacts »** de l'onglet Tickets : l'IA écrira un petit code et le bot enverra le vrai lien sans le modifier. |
 | La commande `/config` n'apparaît pas | Elle est réservée aux administrateurs et enregistrée au démarrage du bot. Redémarre le bot, attends quelques secondes, réessaie. |
 | `EADDRINUSE` / le dashboard ne démarre pas | Le port 3000 est déjà pris (bot lancé deux fois ?). Ferme l'autre fenêtre, ou change `DASHBOARD_PORT` dans le `.env`. |
 | Mot de passe du dashboard oublié | C'est `DASHBOARD_PASSWORD` dans ton fichier `.env`. Si tu ne l'as jamais défini, il s'affiche dans la fenêtre noire au démarrage du bot. |
