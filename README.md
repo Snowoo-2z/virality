@@ -96,6 +96,29 @@ Le bot utilise **Ministral 3 14B** (`ministral-14b-2512`) et espace tout seul se
 
 ---
 
+## ☁️ Déployer gratuitement sur Render (optionnel)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Snowoo-2z/virality/tree/arena/df51ada1-virality)
+
+Le fichier `render.yaml` prépare déjà un **Web Service gratuit**, en région **Frankfurt**, avec démarrage automatique et contrôle de santé sur `/health`.
+
+1. Clique sur le bouton **Deploy to Render** ci-dessus.
+2. Connecte-toi à **Render** et autorise l'accès au dépôt GitHub si Render le demande.
+3. Remplis les secrets demandés :
+   - **`DISCORD_TOKEN`** : le token de ton bot
+   - **`DASHBOARD_PASSWORD`** : un mot de passe solide pour le dashboard (il sera sur internet)
+   - **`MISTRAL_API_KEY`** : ta clé Mistral si tu utilises l'IA des tickets
+   - **`SUPABASE_SERVICE_ROLE_KEY`** : très recommandé pour garder tes réglages après un redémarrage Render
+4. Clique sur **Apply / Deploy** et attends que Render affiche **Live**.
+5. Clique sur l'adresse **onrender.com** du service et connecte-toi avec ton mot de passe dashboard.
+6. Vérifie dans l'onglet **🏗️ Structure & sauvegarde** que **« Auto-ping Render : activé »** s'affiche.
+
+**Auto-ping inclus :** le bot appelle automatiquement son adresse publique `/health` toutes les 10 minutes. Cela limite la mise en veille du plan gratuit (Render endort un service gratuit après 15 minutes sans trafic). Cela consomme des heures gratuites tant que le service reste allumé, donc surveille ton quota si tu as plusieurs services gratuits.
+
+⚠️ **Ne laisse pas le bot local et le bot Render allumés en même temps avec le même token**, sinon discord recevra des réponses en double. Quand Render fonctionne, ferme la fenêtre noire sur ton PC.
+
+⚠️ Sur Render gratuit, les fichiers locaux peuvent être effacés à chaque redéploiement ou redémarrage. La copie **Supabase** permet au bot de récupérer ses réglages automatiquement.
+
 ## 🧩 Variables pour personnaliser les textes
 
 | Variable | Remplacée par |
@@ -125,6 +148,7 @@ Tu peux aussi mettre du `**gras**` et de l' `*italique*` comme dans discord.
 | La commande `/config` n'apparaît pas | Elle est réservée aux administrateurs et enregistrée au démarrage du bot. Redémarre le bot, attends quelques secondes, réessaie. |
 | `EADDRINUSE` / le dashboard ne démarre pas | Le port 3000 est déjà pris (bot lancé deux fois ?). Ferme l'autre fenêtre, ou change `DASHBOARD_PORT` dans le `.env`. |
 | Mot de passe du dashboard oublié | C'est `DASHBOARD_PASSWORD` dans ton fichier `.env`. Si tu ne l'as jamais défini, il s'affiche dans la fenêtre noire au démarrage du bot. |
+| Le bot Render s'endort quand même | Ouvre une fois son adresse `onrender.com` pour le réveiller, puis vérifie dans les logs Render la ligne **« 🔁 Auto-ping activé »** et dans le dashboard **« Auto-ping Render : activé »**. Si le service était arrêté ou en erreur, il ne peut pas se pinger lui-même : corrige l'erreur dans les logs puis redéploie. |
 
 ---
 
@@ -133,6 +157,7 @@ Tu peux aussi mettre du `**gras**` et de l' `*italique*` comme dans discord.
 ```
 virality/
 ├── .env                 ← TES secrets (token + mot de passe) — à créer depuis .env.example
+├── render.yaml          ← déploiement gratuit sur Render (auto-ping inclus)
 ├── data/config.json     ← la configuration sauvegardée (créé automatiquement)
 ├── src/
 │   ├── index.js         ← démarrage (bot + dashboard)

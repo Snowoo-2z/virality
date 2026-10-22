@@ -1,0 +1,53 @@
+# ============================================================
+#  VIRALITY BOT — Déploiement gratuit sur Render
+# ------------------------------------------------------------
+#  Ce fichier dit à Render comment démarrer le bot.
+#  Les secrets (sync: false) seront demandés par Render :
+#  ils ne doivent JAMAIS être écrits ici.
+# ============================================================
+
+services:
+  - type: web
+    name: virality-bot
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: arena/df51ada1-virality
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+
+      # Auto-ping : le bot appelle son adresse Render /health
+      # toutes les 10 minutes pour limiter la mise en veille gratuite.
+      - key: AUTO_PING_MINUTES
+        value: "10"
+
+      # Le serveur discord Virality (déjà rempli).
+      - key: GUILD_ID
+        value: "1562033502612885534"
+
+      # Secrets à coller dans Render au moment du déploiement.
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+
+      # Généré automatiquement par Render pour protéger les connexions
+      # au dashboard.
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # Très recommandé sur Render : les fichiers locaux sont effacés
+      # à chaque redéploiement/redémarrage. Supabase garde donc une
+      # copie des réglages et le bot la récupère tout seul au démarrage.
+      - key: SUPABASE_URL
+        value: https://koxhyhdfsdikhundwinn.supabase.co
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

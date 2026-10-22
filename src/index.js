@@ -30,7 +30,12 @@ async function bootstrap() {
       console.log('☁️  Supabase : sauvegarde cloud activée (miroir de la configuration).');
       if (!hasLocalConfig()) {
         console.log('☁️  Aucune configuration locale trouvée : je regarde sur Supabase...');
-        const remote = await supabase.fetchConfig();
+        // Sur Render, le dashboard doit répondre vite au contrôle de santé :
+        // si Supabase met plus de 10 secondes, on démarre sans attendre.
+        const remote = await Promise.race([
+          supabase.fetchConfig(),
+          new Promise((resolve) => setTimeout(() => resolve(null), 10_000)),
+        ]);
         if (remote) {
           replaceConfig(remote);
           console.log('☁️  ✅ Configuration récupérée depuis Supabase !');

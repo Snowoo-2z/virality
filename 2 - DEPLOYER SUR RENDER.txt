@@ -1,0 +1,82 @@
+==================================================
+   VIRALITY BOT - DEPLOYER GRATUITEMENT SUR RENDER
+==================================================
+
+Fais juste ca, dans l'ordre.
+
+--------------------------------------------------
+ETAPE 1 : Ouvre le lien de deploiement
+--------------------------------------------------
+Copie ce lien dans ton navigateur :
+
+https://render.com/deploy?repo=https://github.com/Snowoo-2z/virality/tree/arena/df51ada1-virality
+
+Connecte-toi a Render.
+Si Render demande l'acces a GitHub, accepte pour
+le depot "virality".
+
+--------------------------------------------------
+ETAPE 2 : Remplis les secrets demandes
+--------------------------------------------------
+DISCORD_TOKEN
+-> le token de ton bot discord.
+
+DASHBOARD_PASSWORD
+-> choisis un mot de passe solide.
+   Le dashboard sera sur internet.
+
+MISTRAL_API_KEY
+-> ta cle Mistral, si tu utilises l'IA des tickets.
+   Sinon, laisse vide (l'IA restera eteinte).
+
+SUPABASE_SERVICE_ROLE_KEY
+-> ta cle secrete Supabase "service_role".
+   TRES RECOMMANDE : Render gratuit peut effacer les
+   fichiers locaux au redemarrage. Supabase garde
+   une copie de tes reglages.
+
+Ne partage jamais ces secrets.
+
+--------------------------------------------------
+ETAPE 3 : Lance le deploiement
+--------------------------------------------------
+Clique sur "Apply" ou "Deploy".
+Attends que Render affiche "Live".
+
+--------------------------------------------------
+ETAPE 4 : Ouvre ton dashboard Render
+--------------------------------------------------
+Clique sur l'adresse qui finit par "onrender.com".
+Connecte-toi avec le DASHBOARD_PASSWORD choisi
+a l'etape 2.
+
+--------------------------------------------------
+ETAPE 5 : Verifie l'auto-ping
+--------------------------------------------------
+Dans le dashboard :
+1) Clique l'onglet "Structure & sauvegarde".
+2) Descends jusqu'a "Auto-ping Render".
+3) Tu dois voir "active".
+
+L'auto-ping appelle automatiquement l'adresse
+/health toutes les 10 minutes. Cela limite la
+mise en veille du plan gratuit, mais consomme
+des heures gratuites tant que le service reste
+allume.
+
+--------------------------------------------------
+TRES IMPORTANT
+--------------------------------------------------
+Ne laisse pas le bot de ton PC et le bot Render
+allumes en meme temps avec le meme token :
+tu aurais des reponses en double sur discord.
+
+Quand Render fonctionne, ferme la fenetre noire
+du bot sur ton PC.
+
+--------------------------------------------------
+BLOQUE QUELQUE PART ?
+--------------------------------------------------
+Fais une capture d'ecran de la page Render (sans
+montrer tes secrets) et dis-moi a quelle etape tu es
+bloque. On avance ensemble, une etape a la fois.

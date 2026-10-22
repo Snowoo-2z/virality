@@ -9,6 +9,7 @@ const express = require('express');
 const session = require('express-session');
 const { getConfig, replaceConfig } = require('./config');
 const bot = require('./bot');
+const { startKeepAlive, status: keepAliveStatus } = require('./keepAlive');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -56,13 +57,44 @@ function startDashboard() {
   const port = Number(process.env.PORT || process.env.DASHBOARD_PORT || 3000);
 
   app.disable('x-powered-by');
+
+  // Derrière Render (proxy HTTPS), Express doit faire confiance au premier
+  // proxy pour connaître la vraie IP (anti-force-brute) et utiliser un
+  // cookie de session sécurisé.
+  const runningOnRender = Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL);
+  if (runningOnRender) app.set('trust proxy', 1);
+
+  // Page de santé publique : utilisée par Render et par l'auto-ping.
+  // Elle ne contient aucune information sensible et répond toujours 200
+  // si le processus web est vivant, même si discord est momentanément KO.
+  app.get('/health', (req, res) => {
+    let botOnline = false;
+    try {
+      botOnline = Boolean(bot.getGuildInfo()?.online);
+    } catch {
+      botOnline = false;
+    }
+    res.status(200).json({
+      ok: true,
+      service: 'virality-bot',
+      botOnline,
+      autoPing: keepAliveStatus().enabled,
+      uptimeSeconds: Math.round(process.uptime()),
+    });
+  });
+
   app.use(express.json({ limit: '256kb' }));
   app.use(express.urlencoded({ extended: false }));
   app.use(session({
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    cookie: { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 },
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: runningOnRender,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    },
   }));
   app.use(express.static(path.join(ROOT, 'public'), { index: false }));
 
@@ -157,14 +189,17 @@ function startDashboard() {
     res.json({
       supabase: require('./supabase').status(),
       ai: bot.getAiRuntime(),
+      keepAlive: keepAliveStatus(),
       guildId: bot.GUILD_ID,
     });
   });
 
   app.listen(port, '0.0.0.0', () => {
+    const publicUrl = String(process.env.RENDER_EXTERNAL_URL || '').trim();
     console.log('');
     console.log('🖥️  DASHBOARD WEB PRÊT');
-    console.log(`    Ouvre dans ton navigateur :  http://localhost:${port}`);
+    console.log(`    Ouvre dans ton navigateur :  ${publicUrl || `http://localhost:${port}`}`);
+    startKeepAlive();
     if (generatedPassword) {
       console.log('    ⚠️  Aucun mot de passe défini dans le .env !');
       console.log(`    Mot de passe temporaire pour cette session :  ${generatedPassword}`);

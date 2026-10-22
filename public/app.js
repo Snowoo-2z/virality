@@ -650,13 +650,18 @@ function renderSystemInfo(sys) {
   const box = $('#systemInfo');
   if (!box) return;
   const s = sys?.supabase || {};
+  const k = sys?.keepAlive || {};
+  const keepAliveLine = k.enabled
+    ? `<div class="system-line">🔁 <b>Auto-ping Render : activé</b> — un ping toutes les ${k.intervalMinutes || 10} minute(s)${k.pings ? `, ${k.pings} ping(s) réussi(s) depuis le démarrage` : ', premier ping dans moins d\'une minute'}.</div>`
+    : '<div class="system-line">💤 <b>Auto-ping : inactif</b> — normal sur ton PC. Il s\'activera tout seul sur Render.</div>';
   if (!s.configured) {
     box.innerHTML =
       '<div class="system-line">☁️ <b>Supabase : non activé</b> — tes réglages sont gardés uniquement sur ce PC.</div>' +
       '<p class="hint">Pour l\'activer : <b>1)</b> sur supabase.com, ouvre ton projet → <b>SQL Editor</b> → colle le contenu du fichier <code class="var">supabase/schema.sql</code> (dans le dossier du bot) → <b>Run</b>. ' +
       '<b>2)</b> Ajoute ces 2 lignes dans ton fichier <code class="var">.env</code>, puis redémarre le bot :</p>' +
       '<pre class="env-snippet">SUPABASE_URL=https://koxhyhdfsdikhundwinn.supabase.co\nSUPABASE_SERVICE_ROLE_KEY=colle_ta_cle_service_role_ici</pre>' +
-      '<p class="hint">La clé secrète se trouve sur supabase.com → ton projet → <b>Project Settings</b> (engrenage) → <b>API Keys</b> → <b>service_role</b>. Garde-la secrète, comme ton token.</p>';
+      '<p class="hint">La clé secrète se trouve sur supabase.com → ton projet → <b>Project Settings</b> (engrenage) → <b>API Keys</b> → <b>service_role</b>. Garde-la secrète, comme ton token.</p>'
+      + keepAliveLine;
     return;
   }
   let syncLine;
@@ -669,7 +674,8 @@ function renderSystemInfo(sys) {
   }
   box.innerHTML =
     `<div class="system-line">☁️ <b>Supabase : activé</b> — ${escapeHtml(s.url || '')}</div>` +
-    `<div class="system-line">${syncLine}</div>`;
+    `<div class="system-line">${syncLine}</div>` +
+    keepAliveLine;
 }
 
 /* ---------------- IA : liens exacts (jamais recopiés par Mistral) ---------------- */
