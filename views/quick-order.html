@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Envoi rapide d'une commande dans le salon commandes, avec ping Clipper." />
   <title>⚡ Commandes rapides · Virality</title>
+  <link rel="icon" href="/assets/logo.jpg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/quick-order.css" />
 </head>
 <body>
@@ -37,7 +41,6 @@
 
     <main class="layout">
       <section class="panel composer reveal reveal-2" aria-labelledby="pageTitle">
-        <div class="eyebrow">⚡ Envoi direct</div>
         <h1 id="pageTitle">Nouvelle commande</h1>
         <p class="subtitle">Colle le lien, clique sur envoyer : l’embed part dans le salon et les clippers sont pingés.</p>
 
@@ -49,24 +52,10 @@
           <span><b>3</b> Ping</span>
         </div>
 
-        <div class="destination" id="destinationCard">
-          <div>
-            <span class="destination-label">Destination</span>
-            <strong id="channelName">#commandes</strong>
-          </div>
-          <span class="destination-arrow">→</span>
-          <div>
-            <span class="destination-label">Ping automatique</span>
-            <strong id="roleName">@Clipper</strong>
-          </div>
-          <span class="ready-badge" id="readyBadge">Vérification…</span>
-        </div>
-
         <form id="quickForm" novalidate>
           <div class="field-head">
             <label for="links">Lien(s) à envoyer</label>
             <div class="field-tools">
-              <button type="button" id="pasteBtn">📋 Coller</button>
               <button type="button" id="clearBtn">Effacer</button>
             </div>
           </div>
@@ -123,13 +112,7 @@
       </section>
 
       <aside class="panel preview-panel reveal reveal-3" aria-labelledby="previewTitle">
-        <div class="preview-header">
-          <div>
-            <span class="eyebrow small">Aperçu en direct</span>
-            <h2 id="previewTitle">Ce que Discord va afficher</h2>
-          </div>
-          <span class="live-badge"><i></i> LIVE</span>
-        </div>
+        <h2 id="previewTitle" class="visually-hidden">Aperçu Discord</h2>
 
         <div class="discord-window">
           <div class="discord-top">
@@ -138,10 +121,17 @@
           </div>
 
           <div class="discord-message">
-            <div class="bot-avatar">▶</div>
+            <img
+              class="bot-avatar"
+              id="previewBotAvatar"
+              src="/assets/logo.jpg"
+              alt="Photo de profil du bot Virality"
+              width="42"
+              height="42"
+            />
             <div class="discord-content">
               <div class="discord-author">
-                <strong>Virality</strong>
+                <strong id="previewBotName">Virality</strong>
                 <span class="bot-tag">BOT</span>
                 <time>à l’instant</time>
               </div>
@@ -157,11 +147,6 @@
               </article>
             </div>
           </div>
-        </div>
-
-        <div class="tip-card">
-          <span>💡</span>
-          <p><strong>Astuce :</strong> colle plusieurs liens d’un coup. Ils seront triés automatiquement dans le même embed.</p>
         </div>
       </aside>
     </main>

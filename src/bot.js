@@ -875,6 +875,10 @@ async function getQuickOrderStatus() {
     online: true,
     onGuild: true,
     guildName: guild.name,
+    botName: targets.me?.displayName || client?.user?.username || 'Virality',
+    botAvatarUrl: targets.me?.displayAvatarURL?.({ size: 128 })
+      || client?.user?.displayAvatarURL?.({ size: 128 })
+      || null,
     channelName: targets.channel?.name || null,
     roleName: targets.role?.name || null,
     canSend: targets.canSend,

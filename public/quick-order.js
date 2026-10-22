@@ -13,17 +13,14 @@ const els = {
   feedback: document.getElementById('feedback'),
   connection: document.getElementById('connection'),
   connectionText: document.getElementById('connectionText'),
-  channelName: document.getElementById('channelName'),
-  roleName: document.getElementById('roleName'),
-  readyBadge: document.getElementById('readyBadge'),
-  destinationCard: document.getElementById('destinationCard'),
   previewChannel: document.getElementById('previewChannel'),
   previewRole: document.getElementById('previewRole'),
+  previewBotName: document.getElementById('previewBotName'),
+  previewBotAvatar: document.getElementById('previewBotAvatar'),
   previewEmbed: document.getElementById('previewEmbed'),
   previewTitle: document.getElementById('previewEmbedTitle'),
   previewMessage: document.getElementById('previewMessage'),
   previewLinks: document.getElementById('previewLinks'),
-  pasteBtn: document.getElementById('pasteBtn'),
   clearBtn: document.getElementById('clearBtn'),
   burstLayer: document.getElementById('burstLayer'),
   composer: document.querySelector('.composer'),
@@ -271,28 +268,22 @@ async function loadStatus() {
     const channelLabel = `#${cleanDisplayName(data.channelName, 'commandes')}`;
     const roleLabel = `@${cleanDisplayName(data.roleName, 'Clipper')}`;
 
-    els.channelName.textContent = channelLabel;
-    els.roleName.textContent = roleLabel;
     els.previewChannel.textContent = channelLabel;
     els.previewRole.textContent = roleLabel;
+    if (data.botName) els.previewBotName.textContent = data.botName;
+    if (data.botAvatarUrl) els.previewBotAvatar.src = data.botAvatarUrl;
 
     if (data.canSend && data.canPing) {
       els.connection.className = 'connection is-online';
       els.connectionText.textContent = 'Bot en ligne';
-      els.readyBadge.className = 'ready-badge is-ready';
-      els.readyBadge.textContent = 'Prêt ✓';
       hideFeedback();
     } else if (data.canSend) {
       els.connection.className = 'connection is-online';
       els.connectionText.textContent = 'Bot en ligne';
-      els.readyBadge.className = 'ready-badge is-error';
-      els.readyBadge.textContent = 'Ping impossible';
       showFeedback('error', `⚠️ ${data.reason || 'Le bot peut envoyer, mais pas ping le rôle Clipper.'}`, true);
     } else {
       els.connection.className = 'connection is-offline';
       els.connectionText.textContent = data.online ? 'À vérifier' : 'Bot hors ligne';
-      els.readyBadge.className = 'ready-badge is-error';
-      els.readyBadge.textContent = 'À vérifier';
       showFeedback('error', `⚠️ ${data.reason || 'Le salon commandes est introuvable.'}`, true);
     }
 
@@ -301,12 +292,16 @@ async function loadStatus() {
     statusState = { canSend: false, canPing: false };
     els.connection.className = 'connection is-offline';
     els.connectionText.textContent = 'Connexion impossible';
-    els.readyBadge.className = 'ready-badge is-error';
-    els.readyBadge.textContent = 'Erreur';
     showFeedback('error', `⚠️ ${err.message}`, true);
     render();
   }
 }
+
+els.previewBotAvatar.addEventListener('error', () => {
+  if (!els.previewBotAvatar.src.endsWith('/assets/logo.jpg')) {
+    els.previewBotAvatar.src = '/assets/logo.jpg';
+  }
+});
 
 els.chips.addEventListener('click', (event) => {
   const button = event.target.closest('.chip-remove');
@@ -321,20 +316,6 @@ els.chips.addEventListener('click', (event) => {
 
 els.links.addEventListener('input', scheduleRender);
 els.message.addEventListener('input', scheduleRender);
-
-els.pasteBtn.addEventListener('click', async () => {
-  try {
-    if (!navigator.clipboard?.readText) throw new Error('Presse-papiers non disponible');
-    const text = await navigator.clipboard.readText();
-    if (!text.trim()) throw new Error('Presse-papiers vide');
-    els.links.value = [els.links.value.trim(), text.trim()].filter(Boolean).join('\n');
-    render();
-    els.links.focus();
-  } catch {
-    showFeedback('error', '📋 Je n’ai pas pu lire le presse-papiers. Clique dans la zone puis appuie sur Ctrl + V.');
-    els.links.focus();
-  }
-});
 
 els.clearBtn.addEventListener('click', () => {
   els.links.value = '';
