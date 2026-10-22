@@ -9,7 +9,7 @@ Le bot discord officiel du serveur **Virality**. Il gère la **bienvenue**, le *
 
 - **👋 Bienvenue** : le message d'accueil des nouveaux membres (voir détail ci-dessous), avec aperçu en direct
 - **🎨 Rôles du serveur** : en 1 clic, renomme + recolore les rôles du staff aux couleurs Virality et crée les rôles **Accueil**, **Membre** et **Clipper** (noms/couleurs ajustables, permissions inchangées)
-- **🎫 Tickets** : système de support complet — panneau stylé avec **plusieurs boutons** publié dans le salon de ton choix. **Chaque bouton = un type de ticket différent** (Question/Support, Commander un clip, Partenariat, + les tiens) avec **ses rôles staff à pinger**, **son message d'ouverture**, **sa catégorie**, **son nom de salon** et **son comportement IA**. Salon privé créé automatiquement, formulaire de sujet optionnel, fermeture avec **transcription** (.txt) dans un salon de logs et/ou en MP. En bonus : une **assistante IA Ministral 3 14B** (`ministral-14b-2512`) peut accueillir le membre et répondre dans le ticket — modèle, déclencheur, créativité, mémoire et consignes (générales + par bouton) sont réglables depuis cet onglet
+- **🎫 Tickets** : système de support complet — panneau stylé avec **plusieurs boutons** publié dans le salon de ton choix. **Chaque bouton = un type de ticket différent** (Question/Support, Commander un clip, Partenariat, + les tiens) avec **ses rôles staff à pinger**, **son message d'ouverture**, **sa catégorie**, **son nom de salon** et **son comportement IA**. Salon privé créé automatiquement, formulaire de sujet optionnel, fermeture avec **transcription** (.txt) dans un salon de logs et/ou en MP. Tu peux aussi **ouvrir un ticket en 1 clic depuis le dashboard** : recherche le membre, choisis le type (ex. Partenariat ou Devenir clipper), et le bot crée le salon automatiquement. En bonus : une **assistante IA Ministral 3 14B** (`ministral-14b-2512`) peut accueillir le membre et répondre dans le ticket — modèle, déclencheur, créativité, mémoire et consignes (générales + par bouton) sont réglables depuis cet onglet
 - **🧱 Embeds** : créateur d'embeds 100 % personnalisable (auteur, titre, description, couleur, footer, grande image, miniature, horodatage, **champs** titre+texte, texte au-dessus, mentions @everyone) avec aperçu en direct, **modèles enregistrables** et envoi en 1 clic dans le salon de ton choix
 - **🏗️ Structure & sauvegarde** : en 1 clic, construis tout le serveur — catégories **📌 Informations** (annonces, bienvenue, à-propos, en lecture seule), **💬 Communauté** (success-flex, proof, tickets) et **🔒 Espace Clipper** privé (commandes, discussion, bonus : les Membres voient sans l'historique, les Clippers voient tout). Le bot ne supprime jamais rien : il crée ce qui manque et range ce qui existe. C'est aussi là qu'on active la **sauvegarde automatique sur Supabase** (optionnelle) : une copie de tes réglages est envoyée à chaque enregistrement, et récupérée toute seule si tu changes de PC (voir les lignes `SUPABASE_...` dans `.env.example` et le fichier `supabase/schema.sql`)
 
@@ -82,6 +82,19 @@ Tape `/config` dans n'importe quel salon du serveur (il faut être administrateu
 
 Les deux modifient la **même configuration** (fichier `data/config.json`), appliquée immédiatement, sans redémarrer le bot.
 
+### ⚡ Mini-interface Commandes (accès limité `bcko`)
+
+Il existe une deuxième page, volontairement séparée du dashboard : **`/commandes`** (ex. `http://localhost:3000/commandes`, ou ton adresse Render suivie de `/commandes`).
+
+1. Connecte-toi avec le mot de passe **`bcko`**.
+2. Colle un ou plusieurs liens.
+3. Ajoute un petit message si tu veux.
+4. Clique sur **« Envoyer et ping @Clipper »**.
+
+Le bot envoie alors directement un **embed Virality** dans **#🛒・commandes** et mentionne **@Clipper**. Cette page ne montre **aucun autre réglage** : une personne connectée avec `bcko` ne peut ni ouvrir le dashboard normal, ni lire ou modifier la configuration.
+
+> ⚠️ `bcko` est facile à deviner. Sur Render/internet, il est conseillé de le remplacer par un mot de passe plus solide avec la variable `BCKO_PASSWORD`. Sans cette variable, `bcko` reste le mot de passe par défaut.
+
 ### 🤖 Activer l'assistante IA des tickets (optionnel)
 
 1. Va sur <https://console.mistral.ai> → **API Keys** → crée une clé → **copie-la**
@@ -111,7 +124,8 @@ Le fichier `render.yaml` prépare déjà un **Web Service gratuit**, en région 
    - **`SUPABASE_SERVICE_ROLE_KEY`** : très recommandé pour garder tes réglages après un redémarrage Render
 4. Clique sur **Apply / Deploy** et attends que Render affiche **Live**.
 5. Clique sur l'adresse **onrender.com** du service et connecte-toi avec ton mot de passe dashboard.
-6. Vérifie dans l'onglet **🏗️ Structure & sauvegarde** que **« Auto-ping Render : activé »** s'affiche.
+6. Pour la mini-interface limitée, ouvre la même adresse suivie de **`/commandes`** et connecte-toi avec **`bcko`** (ou ton `BCKO_PASSWORD` si tu l'as ajouté dans Render → Environment).
+7. Vérifie dans l'onglet **🏗️ Structure & sauvegarde** que **« Auto-ping Render : activé »** s'affiche.
 
 **Auto-ping inclus :** le bot appelle automatiquement son adresse publique `/health` toutes les 10 minutes. Cela limite la mise en veille du plan gratuit (Render endort un service gratuit après 15 minutes sans trafic). Cela consomme des heures gratuites tant que le service reste allumé, donc surveille ton quota si tu as plusieurs services gratuits.
 

@@ -255,22 +255,34 @@ async function resolveCategory(guild, me, cfg, type) {
   return category;
 }
 
-async function createTicket(interaction, subject, typeKey) {
-  const guild = interaction.guild;
-  const member = interaction.member;
+/**
+ * Crée un ticket normal pour un membre donné.
+ * Utilisé par les boutons discord ET par l'ouverture manuelle du dashboard.
+ */
+async function createTicketForMember({ guild, member, subject = '', typeKey = null, openedBy = 'member' } = {}) {
   const cfg = getConfig().tickets;
+  if (!cfg.enabled) {
+    return { ok: false, reason: 'Le système de tickets est désactivé. Active-le en haut de l\'onglet Tickets, puis enregistre.' };
+  }
+  if (!guild || !member) {
+    return { ok: false, reason: 'Membre ou serveur introuvable.' };
+  }
   const type = typeByKey(cfg, typeKey);
   const me = guild.members.me || (await guild.members.fetchMe().catch(() => null));
-  if (!me) throw new Error('Impossible de récupérer le membre du bot.');
+  if (!me) return { ok: false, reason: 'Impossible de récupérer le membre du bot.' };
 
   await guild.channels.fetch().catch(() => {});
   const already = findUserTickets(guild, member.id);
   if (already.size >= cfg.maxPerUser) {
     const first = already.first();
-    await interaction.editReply({
-      content: `🎫 Tu as déjà ${already.size > 1 ? 'des tickets ouverts' : 'un ticket ouvert'} : ${first} — continue là-bas, on s'occupe de toi !`,
-    });
-    return;
+    return {
+      ok: false,
+      alreadyExists: true,
+      channel: first,
+      channelId: first?.id || null,
+      channelName: first?.name || null,
+      reason: `Ce membre a déjà ${already.size > 1 ? 'des tickets ouverts' : 'un ticket ouvert'}${first ? ` (#${first.name})` : ''}.`,
+    };
   }
 
   const staffIds = staffRolesOf(guild, typeStaffRoleIds(cfg, type)).map((r) => r.id);
@@ -284,7 +296,7 @@ async function createTicket(interaction, subject, typeKey) {
     parent: category.id,
     topic,
     permissionOverwrites: baseOverwrites(guild, me, staffIds, member.id),
-    reason: `Ticket ouvert par ${member.user.tag}${type ? ` (${type.name})` : ''}`,
+    reason: `Ticket ${openedBy === 'dashboard' ? 'ouvert depuis le dashboard pour' : 'ouvert par'} ${member.user.tag}${type ? ` (${type.name})` : ''}`,
   });
 
   cfg.counter = number;
@@ -302,8 +314,16 @@ async function createTicket(interaction, subject, typeKey) {
     )],
   }) || { content: `Bienvenue dans ton ticket, ${member} !` };
 
-  if (subject && payload.embeds?.[0]) {
-    payload.embeds[0].addFields({ name: '📝 Sujet', value: subject.slice(0, 1024) });
+  const openEmbed = payload.embeds?.[0];
+  const canAddEmbedField = () => (openEmbed?.data?.fields?.length || 0) < 25; // limite discord
+  if (subject && openEmbed && canAddEmbedField()) {
+    openEmbed.addFields({ name: '📝 Sujet', value: subject.slice(0, 1024) });
+  }
+  if (openedBy === 'dashboard' && openEmbed && canAddEmbedField()) {
+    openEmbed.addFields({
+      name: '🖥️ Ouverture',
+      value: 'Ticket créé directement par l\'équipe depuis le dashboard.',
+    });
   }
 
   const shouldPingStaff = type ? type.pingStaff : cfg.pingStaff;
@@ -313,13 +333,49 @@ async function createTicket(interaction, subject, typeKey) {
   payload.allowedMentions = { users: [member.id], roles: shouldPingStaff ? staffIds : [] };
 
   await channel.send(payload);
-  await interaction.editReply({
-    content: `✅ Ton ticket est ouvert : ${channel} — clique pour y aller !`,
-  });
 
   // Premier message de l'IA (si activée) : en arrière-plan, sans bloquer l'ouverture
   maybeAiGreeting(channel, member, { number, subject: subject || '', type })
     .catch((err) => console.warn('⚠️  Accueil IA du ticket échoué :', err.message));
+
+  return {
+    ok: true,
+    channel,
+    channelId: channel.id,
+    channelName: channel.name,
+    number,
+    type,
+    typeId: type?.id || null,
+    typeName: type?.name || null,
+  };
+}
+
+/** Ouverture depuis un bouton / formulaire discord (comportement historique). */
+async function createTicket(interaction, subject, typeKey) {
+  const result = await createTicketForMember({
+    guild: interaction.guild,
+    member: interaction.member,
+    subject,
+    typeKey,
+    openedBy: 'member',
+  });
+
+  if (result.alreadyExists) {
+    await interaction.editReply({
+      content: `🎫 Tu as déjà un ticket ouvert : ${result.channel} — continue là-bas, on s'occupe de toi !`,
+    });
+    return;
+  }
+  if (!result.ok) {
+    await interaction.editReply({
+      content: `❌ ${result.reason || 'Impossible d\'ouvrir ce ticket.'}`,
+    });
+    return;
+  }
+
+  await interaction.editReply({
+    content: `✅ Ton ticket est ouvert : ${result.channel} — clique pour y aller !`,
+  });
 }
 
 /* --------------------------- Fermeture + transcription --------------------------- */
@@ -756,6 +812,7 @@ module.exports = {
   handleInteraction,
   handleMessage,
   publishPanel,
+  createTicketForMember,
   // Exportés pour les tests
   sanitizeChannelName,
   ticketChannelName,

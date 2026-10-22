@@ -24,8 +24,8 @@
       </form>
 
       <p class="hint" style="margin-top:16px;text-align:left">
-        Le mot de passe est celui de <code>DASHBOARD_PASSWORD</code> dans le fichier <code>.env</code>.
-        Si tu ne l'as pas défini, il est affiché dans la fenêtre noire du bot au démarrage.
+        Le mot de passe principal est celui de <code>DASHBOARD_PASSWORD</code> dans le fichier <code>.env</code>.
+        L'accès rapide <b>Commandes</b> utilise son mot de passe séparé et n'affiche aucun réglage.
       </p>
     </div>
   </div>
@@ -48,7 +48,7 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Erreur de connexion.');
-        window.location.href = '/';
+        window.location.href = data.redirect === '/commandes' ? '/commandes' : '/';
       } catch (err) {
         errorBox.textContent = '❌ ' + err.message;
         errorBox.style.display = 'block';

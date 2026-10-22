@@ -21,6 +21,16 @@ if (!dashboardPassword || dashboardPassword === 'choisis_un_mot_de_passe') {
   dashboardPassword = generatedPassword;
 }
 
+// Deuxième mot de passe, volontairement limité : il ouvre uniquement la
+// mini-interface Commandes (#commandes + ping @Clipper), jamais les réglages.
+// Par défaut "bcko" comme demandé ; BCKO_PASSWORD permet de le remplacer
+// par un mot de passe plus solide (fortement conseillé sur Render).
+const quickOrderPassword = Object.prototype.hasOwnProperty.call(process.env, 'BCKO_PASSWORD')
+  ? String(process.env.BCKO_PASSWORD || '').trim()
+  : 'bcko';
+const quickOrderPasswordIsCustom = Object.prototype.hasOwnProperty.call(process.env, 'BCKO_PASSWORD')
+  && quickOrderPassword !== 'bcko';
+
 const sessionSecret = (process.env.SESSION_SECRET || '').trim()
   || crypto.randomBytes(32).toString('hex');
 
@@ -41,16 +51,29 @@ function registerFailedAttempt(ip) {
   loginAttempts.set(ip, entry);
 }
 
-function passwordsMatch(given) {
+function secretMatches(given, expected) {
+  if (!expected) return false;
   const a = Buffer.from(String(given || ''));
-  const b = Buffer.from(dashboardPassword);
+  const b = Buffer.from(String(expected));
   return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function passwordsMatch(given) {
+  return secretMatches(given, dashboardPassword);
 }
 
 function requireAuthApi(req, res, next) {
   if (req.session?.authenticated) return next();
   return res.status(401).json({ error: 'Non connecté.' });
 }
+
+function requireQuickApi(req, res, next) {
+  if (req.session?.authenticated || req.session?.quickAuthenticated) return next();
+  return res.status(401).json({ error: 'Non connecté.' });
+}
+
+// Anti-spam très simple pour le ping @Clipper de la mini-interface.
+const lastQuickOrderAt = new Map();
 
 function startDashboard() {
   const app = express();
@@ -101,12 +124,25 @@ function startDashboard() {
   // ----- Pages -----
   app.get('/login', (req, res) => {
     if (req.session?.authenticated) return res.redirect('/');
+    if (req.session?.quickAuthenticated) return res.redirect('/commandes');
     res.sendFile(path.join(ROOT, 'views', 'login.html'));
   });
 
   app.get('/', (req, res) => {
-    if (!req.session?.authenticated) return res.redirect('/login');
-    res.sendFile(path.join(ROOT, 'views', 'dashboard.html'));
+    if (req.session?.authenticated) {
+      return res.sendFile(path.join(ROOT, 'views', 'dashboard.html'));
+    }
+    if (req.session?.quickAuthenticated) return res.redirect('/commandes');
+    return res.redirect('/login');
+  });
+
+  // Mini-interface limitée : aucun réglage, seulement l'envoi rapide
+  // d'une commande avec lien(s) + ping @Clipper.
+  app.get('/commandes', (req, res) => {
+    if (req.session?.authenticated || req.session?.quickAuthenticated) {
+      return res.sendFile(path.join(ROOT, 'views', 'quick-order.html'));
+    }
+    return res.redirect('/login');
   });
 
   // ----- Connexion / déconnexion -----
@@ -116,13 +152,28 @@ function startDashboard() {
       return res.status(429).json({ error: 'Trop de tentatives. Réessaie dans 5 minutes.' });
     }
     const password = req.body?.password;
-    if (!passwordsMatch(password)) {
+    const isAdmin = passwordsMatch(password);
+    const isQuick = !isAdmin && secretMatches(password, quickOrderPassword);
+
+    if (!isAdmin && !isQuick) {
       registerFailedAttempt(ip);
       return res.status(401).json({ error: 'Mot de passe incorrect.' });
     }
+
     loginAttempts.delete(ip);
-    req.session.authenticated = true;
-    return res.json({ ok: true });
+    if (isAdmin) {
+      req.session.authenticated = true;
+      delete req.session.quickAuthenticated;
+      req.session.accessLevel = 'admin';
+      return res.json({ ok: true, redirect: '/' });
+    }
+
+    // Important : on ne met surtout pas "authenticated" ici. Toutes les
+    // routes du dashboard normal resteront donc interdites à bcko.
+    delete req.session.authenticated;
+    req.session.quickAuthenticated = true;
+    req.session.accessLevel = 'quick';
+    return res.json({ ok: true, redirect: '/commandes' });
   });
 
   app.post('/logout', (req, res) => {
@@ -173,6 +224,73 @@ function startDashboard() {
     res.json({ ok: true, updated: Boolean(result.updated), channelName: result.channelName, config: result.config });
   });
 
+  // Recherche un membre pour l'ouverture manuelle d'un ticket
+  app.get('/api/tickets/members', requireAuthApi, async (req, res) => {
+    const result = await bot.searchGuildMembers(req.query.q || '');
+    if (!result.ok) return res.status(400).json({ error: result.reason, members: [] });
+    return res.json({ ok: true, members: result.members });
+  });
+
+  // Ouvre directement un ticket normal depuis le dashboard
+  app.post('/api/tickets/create', requireAuthApi, async (req, res) => {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Demande de ticket invalide.' });
+    }
+    const result = await bot.createManualTicket(req.body);
+    if (!result.ok) {
+      return res.status(400).json({
+        error: result.reason || 'Impossible d\'ouvrir ce ticket.',
+        alreadyExists: Boolean(result.alreadyExists),
+        channelId: result.channelId || null,
+        channelName: result.channelName || null,
+      });
+    }
+    return res.json({
+      ok: true,
+      channelId: result.channelId,
+      channelName: result.channelName,
+      number: result.number,
+      typeName: result.typeName,
+      memberName: result.memberName,
+      memberTag: result.memberTag,
+      config: result.config,
+    });
+  });
+
+  // Mini-interface Commandes : état limité (salon + rôle retrouvés ou non)
+  app.get('/api/quick-order/status', requireQuickApi, async (req, res) => {
+    try {
+      return res.json(await bot.getQuickOrderStatus());
+    } catch (err) {
+      return res.status(500).json({ ok: false, reason: `État indisponible : ${err.message}` });
+    }
+  });
+
+  // Mini-interface Commandes : envoi direct dans #commandes + ping @Clipper
+  app.post('/api/quick-order/send', requireQuickApi, async (req, res) => {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Commande invalide.' });
+    }
+
+    const cooldownKey = `${req.sessionID || 'sans-session'}:${req.ip || 'inconnue'}`;
+    const last = lastQuickOrderAt.get(cooldownKey) || 0;
+    if (Date.now() - last < 3000) {
+      return res.status(429).json({ error: 'Doucement 😅 Attends 3 secondes avant d\'envoyer une autre commande.' });
+    }
+
+    const result = await bot.sendQuickOrder(req.body);
+    if (!result.ok) return res.status(400).json({ error: result.reason || 'Envoi impossible.' });
+
+    lastQuickOrderAt.set(cooldownKey, Date.now());
+    return res.json({
+      ok: true,
+      channelName: result.channelName,
+      roleName: result.roleName,
+      messageId: result.messageId,
+      linksCount: result.linksCount,
+    });
+  });
+
   // Envoie un modèle d'embed (créateur d'embeds) dans son salon cible
   app.post('/api/embeds/send', requireAuthApi, async (req, res) => {
     const index = Number(req.body?.index);
@@ -198,7 +316,9 @@ function startDashboard() {
     const publicUrl = String(process.env.RENDER_EXTERNAL_URL || '').trim();
     console.log('');
     console.log('🖥️  DASHBOARD WEB PRÊT');
-    console.log(`    Ouvre dans ton navigateur :  ${publicUrl || `http://localhost:${port}`}`);
+    const baseUrl = (publicUrl || `http://localhost:${port}`).replace(/\/+$/, '');
+    console.log(`    Ouvre dans ton navigateur :  ${baseUrl}`);
+    console.log(`    Commandes rapides (bcko) :  ${baseUrl}/commandes`);
     startKeepAlive();
     if (generatedPassword) {
       console.log('    ⚠️  Aucun mot de passe défini dans le .env !');
@@ -207,6 +327,11 @@ function startDashboard() {
     } else {
       console.log('    Mot de passe : celui que tu as mis dans le fichier .env (DASHBOARD_PASSWORD)');
     }
+    console.log(
+      quickOrderPassword
+        ? `    Accès limité Commandes : ${quickOrderPasswordIsCustom ? 'mot de passe BCKO_PASSWORD du .env' : 'bcko (par défaut)'}`
+        : '    Accès limité Commandes : désactivé (BCKO_PASSWORD vide)'
+    );
     console.log('');
   });
 

@@ -36,6 +36,26 @@ Mot de passe : celui que tu as ecrit dans le fichier
 .env (ligne DASHBOARD_PASSWORD=...).
 
 --------------------------------------------------
+NOUVEAU : commandes rapides (page separee)
+--------------------------------------------------
+1) Dans Chrome, tape :
+   http://localhost:3000/commandes
+2) Mot de passe : bcko
+3) Colle ton lien.
+4) Clique "Envoyer et ping @Clipper".
+L'embed part tout seul dans le salon commandes.
+Cette page ne montre aucun autre reglage.
+
+--------------------------------------------------
+NOUVEAU : ouvrir un ticket depuis le dashboard
+--------------------------------------------------
+1) Ouvre le dashboard normal.
+2) Clique l'onglet Tickets.
+3) Cherche le pseudo du membre.
+4) Choisis le type, par exemple Partenariat.
+5) Clique "Ouvrir le ticket automatiquement".
+
+--------------------------------------------------
 BONUS : l'IA dans les tickets (optionnel)
 --------------------------------------------------
 1) Cree ta cle sur https://console.mistral.ai

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Envoi rapide d'une commande dans le salon commandes, avec ping Clipper." />
+  <title>⚡ Commandes rapides · Virality</title>
+  <link rel="stylesheet" href="/quick-order.css" />
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="grid-glow"></span>
+  </div>
+
+  <div class="shell">
+    <header class="topbar reveal reveal-1">
+      <div class="brand" aria-label="Virality Commandes">
+        <span class="brand-mark">▶</span>
+        <span>
+          <strong>VIRALITY</strong>
+          <small>Commandes rapides</small>
+        </span>
+      </div>
+
+      <div class="top-actions">
+        <div class="connection" id="connection" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="connectionText">Connexion…</span>
+        </div>
+        <form method="POST" action="/logout">
+          <button class="logout" type="submit">Déconnexion</button>
+        </form>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel composer reveal reveal-2" aria-labelledby="pageTitle">
+        <div class="eyebrow">⚡ Envoi direct</div>
+        <h1 id="pageTitle">Nouvelle commande</h1>
+        <p class="subtitle">Colle le lien, clique sur envoyer : l’embed part dans le salon et les clippers sont pingés.</p>
+
+        <div class="steps" aria-label="Étapes">
+          <span><b>1</b> Colle</span>
+          <i></i>
+          <span><b>2</b> Envoie</span>
+          <i></i>
+          <span><b>3</b> Ping</span>
+        </div>
+
+        <div class="destination" id="destinationCard">
+          <div>
+            <span class="destination-label">Destination</span>
+            <strong id="channelName">#commandes</strong>
+          </div>
+          <span class="destination-arrow">→</span>
+          <div>
+            <span class="destination-label">Ping automatique</span>
+            <strong id="roleName">@Clipper</strong>
+          </div>
+          <span class="ready-badge" id="readyBadge">Vérification…</span>
+        </div>
+
+        <form id="quickForm" novalidate>
+          <div class="field-head">
+            <label for="links">Lien(s) à envoyer</label>
+            <div class="field-tools">
+              <button type="button" id="pasteBtn">📋 Coller</button>
+              <button type="button" id="clearBtn">Effacer</button>
+            </div>
+          </div>
+
+          <div class="textarea-wrap">
+            <textarea
+              id="links"
+              rows="4"
+              inputmode="url"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Colle un lien ici…&#10;Tu peux aussi en mettre plusieurs, un par ligne."
+              aria-describedby="linksHelp linkCount"
+            ></textarea>
+            <span class="focus-ring" aria-hidden="true"></span>
+          </div>
+
+          <div class="field-meta">
+            <span id="linksHelp">Maximum 10 liens</span>
+            <span id="linkCount" class="counter">0 lien</span>
+          </div>
+
+          <div class="chip-zone" id="linkChips" aria-live="polite"></div>
+
+          <div class="field-head message-head">
+            <label for="message">Petit message <span>(optionnel)</span></label>
+            <span class="counter" id="messageCount">0 / 300</span>
+          </div>
+
+          <div class="quick-messages" aria-label="Messages rapides">
+            <button type="button" data-quick-message="🚨 Commande urgente, merci de la traiter rapidement !">🚨 Urgent</button>
+            <button type="button" data-quick-message="⚡ Nouvelle commande dispo, à vos clips !">⚡ À vos clips</button>
+            <button type="button" data-quick-message="📌 Nouvelle commande à traiter. Merci !">📌 Standard</button>
+          </div>
+
+          <textarea
+            id="message"
+            rows="2"
+            maxlength="300"
+            placeholder="Ex : Commande urgente, merci de la traiter rapidement !"
+          ></textarea>
+
+          <div class="feedback" id="feedback" role="status" aria-live="polite"></div>
+
+          <button class="send-button" id="sendBtn" type="submit" disabled>
+            <span class="button-shine" aria-hidden="true"></span>
+            <span class="button-icon" id="sendIcon">➤</span>
+            <span id="sendLabel">Envoyer et ping @Clipper</span>
+          </button>
+
+          <p class="shortcut"><kbd>Ctrl</kbd> + <kbd>Entrée</kbd> pour envoyer encore plus vite</p>
+        </form>
+      </section>
+
+      <aside class="panel preview-panel reveal reveal-3" aria-labelledby="previewTitle">
+        <div class="preview-header">
+          <div>
+            <span class="eyebrow small">Aperçu en direct</span>
+            <h2 id="previewTitle">Ce que Discord va afficher</h2>
+          </div>
+          <span class="live-badge"><i></i> LIVE</span>
+        </div>
+
+        <div class="discord-window">
+          <div class="discord-top">
+            <span></span><span></span><span></span>
+            <b id="previewChannel">#commandes</b>
+          </div>
+
+          <div class="discord-message">
+            <div class="bot-avatar">▶</div>
+            <div class="discord-content">
+              <div class="discord-author">
+                <strong>Virality</strong>
+                <span class="bot-tag">BOT</span>
+                <time>à l’instant</time>
+              </div>
+
+              <div class="role-ping" id="previewRole">@Clipper</div>
+
+              <article class="discord-embed" id="previewEmbed">
+                <h3 id="previewEmbedTitle">🎬 Nouvelle commande</h3>
+                <p id="previewMessage" class="preview-placeholder">Ton petit message apparaîtra ici.</p>
+                <div class="preview-links-title">🔗 Lien(s)</div>
+                <p id="previewLinks" class="preview-placeholder">Colle un lien pour voir l’aperçu.</p>
+                <footer>Virality · Commandes rapides</footer>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <div class="tip-card">
+          <span>💡</span>
+          <p><strong>Astuce :</strong> colle plusieurs liens d’un coup. Ils seront triés automatiquement dans le même embed.</p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="footer reveal reveal-4">Interface limitée · Aucun réglage du serveur n’est accessible ici.</footer>
+  </div>
+
+  <div class="burst-layer" id="burstLayer" aria-hidden="true"></div>
+  <script src="/quick-order.js" defer></script>
+</body>
+</html>

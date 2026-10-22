@@ -51,7 +51,23 @@ Connecte-toi avec le DASHBOARD_PASSWORD choisi
 a l'etape 2.
 
 --------------------------------------------------
-ETAPE 5 : Verifie l'auto-ping
+ETAPE 5 : Ouvre la page Commandes rapides
+--------------------------------------------------
+Prends la meme adresse onrender.com et ajoute
+/commandes a la fin. Exemple :
+https://ton-adresse.onrender.com/commandes
+
+Mot de passe : bcko
+Colle ton lien, puis clique
+"Envoyer et ping @Clipper".
+Cette page ne montre aucun autre reglage.
+
+Attention : bcko est facile a deviner. Plus tard,
+tu pourras le changer dans Render -> Environment
+avec BCKO_PASSWORD.
+
+--------------------------------------------------
+ETAPE 6 : Verifie l'auto-ping
 --------------------------------------------------
 Dans le dashboard :
 1) Clique l'onglet "Structure & sauvegarde".

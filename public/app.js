@@ -308,6 +308,9 @@ function buildTicketStaffRoles() {
 
 /* ------------- Tickets : types / boutons du panneau ------------- */
 let ticketTypeIndex = 0;
+let manualTicketMember = null;
+let manualMemberSearchTimer = null;
+let manualMemberSearchRequest = 0;
 
 function selectedTicketType() {
   const types = config?.tickets?.types;
@@ -333,6 +336,7 @@ function fillTicketTypeForm() {
     .join('');
   select.value = String(ticketTypeIndex);
   $('#deleteTicketTypeBtn').disabled = config.tickets.types.length <= 1;
+  syncManualTicketTypes();
 
   const set = (id, value) => { const el = document.getElementById(id); if (el) el.value = value ?? ''; };
   const setCheck = (id, value) => { const el = document.getElementById(id); if (el) el.checked = Boolean(value); };
@@ -378,6 +382,151 @@ function refreshTicketTypeEditor() {
   buildTicketForms();
   fillForm();
   updateTicketPreview();
+}
+
+/* ------------- Tickets : ouverture manuelle en 1 clic ------------- */
+function syncManualTicketTypes() {
+  const select = $('#manualTicketType');
+  if (!select || !config?.tickets) return;
+  const previous = select.value;
+  const types = Array.isArray(config.tickets.types) ? config.tickets.types : [];
+
+  select.replaceChildren();
+  if (!types.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Aucun type de ticket configuré';
+    select.append(opt);
+    select.disabled = true;
+    return;
+  }
+
+  for (const type of types) {
+    const opt = document.createElement('option');
+    opt.value = type.id || '';
+    opt.textContent = `${type.buttonEmoji ? `${type.buttonEmoji} ` : ''}${type.name || type.buttonLabel || 'Ticket'}`;
+    select.append(opt);
+  }
+  select.disabled = false;
+  select.value = types.some((type) => type.id === previous) ? previous : (types[0].id || '');
+}
+
+function setManualTicketFeedback(type, message) {
+  const box = $('#manualTicketFeedback');
+  if (!box) return;
+  box.className = `manual-ticket-feedback show ${type}`;
+  box.textContent = message;
+}
+
+function renderManualTicketSelectedMember() {
+  const box = $('#manualTicketSelectedMember');
+  if (!box) return;
+  box.replaceChildren();
+
+  if (!manualTicketMember) {
+    box.hidden = true;
+    return;
+  }
+
+  box.hidden = false;
+  if (manualTicketMember.avatarUrl) {
+    const img = document.createElement('img');
+    img.src = manualTicketMember.avatarUrl;
+    img.alt = '';
+    box.append(img);
+  }
+
+  const text = document.createElement('span');
+  const strong = document.createElement('b');
+  strong.textContent = manualTicketMember.displayName || manualTicketMember.username;
+  text.append(strong, document.createTextNode(` · @${manualTicketMember.username || ''}`));
+
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.textContent = 'Changer';
+  clear.addEventListener('click', () => {
+    manualTicketMember = null;
+    renderManualTicketSelectedMember();
+    const search = $('#manualTicketMemberSearch');
+    if (search) {
+      search.value = '';
+      search.focus();
+    }
+  });
+
+  box.append(text, clear);
+}
+
+function renderManualMemberResults(members, message = '') {
+  const box = $('#manualTicketMemberResults');
+  if (!box) return;
+  box.replaceChildren();
+
+  if (message) {
+    const note = document.createElement('div');
+    note.className = 'member-search-message';
+    note.textContent = message;
+    box.append(note);
+    return;
+  }
+
+  for (const member of members) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'member-result';
+
+    if (member.avatarUrl) {
+      const img = document.createElement('img');
+      img.src = member.avatarUrl;
+      img.alt = '';
+      button.append(img);
+    }
+
+    const text = document.createElement('span');
+    text.className = 'member-result-text';
+    const name = document.createElement('b');
+    name.textContent = member.displayName || member.username;
+    const handle = document.createElement('span');
+    handle.textContent = `@${member.username || ''}`;
+    text.append(name, handle);
+    button.append(text);
+
+    button.addEventListener('click', () => {
+      manualTicketMember = member;
+      renderManualTicketSelectedMember();
+      renderManualMemberResults([]);
+      const search = $('#manualTicketMemberSearch');
+      if (search) search.value = member.displayName || member.username;
+      $('#manualTicketType')?.focus();
+    });
+
+    box.append(button);
+  }
+}
+
+async function searchManualTicketMembers() {
+  const input = $('#manualTicketMemberSearch');
+  const query = input?.value.trim() || '';
+  const requestId = ++manualMemberSearchRequest;
+
+  if (query.length < 2) {
+    renderManualMemberResults([]);
+    return;
+  }
+
+  renderManualMemberResults([], '🔎 Recherche du membre…');
+  try {
+    const data = await api(`/api/tickets/members?q=${encodeURIComponent(query)}`);
+    if (requestId !== manualMemberSearchRequest) return;
+    if (!data.members?.length) {
+      renderManualMemberResults([], 'Aucun membre trouvé avec ce pseudo.');
+      return;
+    }
+    renderManualMemberResults(data.members);
+  } catch (err) {
+    if (requestId !== manualMemberSearchRequest) return;
+    renderManualMemberResults([], `❌ ${err.message}`);
+  }
 }
 
 /* ----------- Fabrique de champs d'embed (réutilisée partout) ----------- */
@@ -1105,6 +1254,85 @@ $('#publishPanelBtn').addEventListener('click', async () => {
       ? `✅ Panneau de tickets mis à jour dans #${data.channelName} !`
       : `✅ Panneau publié dans #${data.channelName} ! Va cliquer le bouton pour tester 🎫`);
   } catch (err) {
+    showToast('❌ ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+});
+
+/* ---------- Tickets : ouverture manuelle depuis le dashboard ---------- */
+$('#manualTicketMemberSearch')?.addEventListener('input', (event) => {
+  const value = event.target.value.trim();
+  if (manualTicketMember && value !== (manualTicketMember.displayName || manualTicketMember.username)) {
+    manualTicketMember = null;
+    renderManualTicketSelectedMember();
+  }
+  clearTimeout(manualMemberSearchTimer);
+  manualMemberSearchTimer = setTimeout(searchManualTicketMembers, 250);
+});
+
+$('#createManualTicketBtn')?.addEventListener('click', async () => {
+  const btn = $('#createManualTicketBtn');
+  const typeSelect = $('#manualTicketType');
+  const subjectInput = $('#manualTicketSubject');
+  if (!btn || !typeSelect) return;
+
+  if (!manualTicketMember) {
+    setManualTicketFeedback('error', '👤 Choisis d’abord un membre dans les résultats de recherche.');
+    $('#manualTicketMemberSearch')?.focus();
+    return;
+  }
+  if (!typeSelect.value) {
+    setManualTicketFeedback('error', '🎛️ Choisis un type de ticket.');
+    typeSelect.focus();
+    return;
+  }
+
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Création du ticket…';
+
+  try {
+    // On enregistre d'abord les réglages affichés : le ticket manuel utilise
+    // donc bien le type, ses rôles staff et son message d'ouverture actuels.
+    collectForm();
+    const saved = await api('/api/config', { method: 'POST', body: JSON.stringify(config) });
+    config = saved.config;
+    syncManualTicketTypes();
+
+    let typeId = typeSelect.value;
+    if (!config.tickets.types.some((type) => type.id === typeId)) {
+      typeId = config.tickets.types[0]?.id || '';
+      typeSelect.value = typeId;
+    }
+
+    const data = await api('/api/tickets/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        memberId: manualTicketMember.id,
+        typeId,
+        subject: subjectInput?.value.trim() || '',
+      }),
+    });
+
+    if (data.config) config = data.config;
+    const memberLabel = data.memberName || manualTicketMember.displayName || manualTicketMember.username;
+    setManualTicketFeedback(
+      'success',
+      `✅ Ticket « ${data.typeName || 'Ticket'} » ouvert pour ${memberLabel} dans #${data.channelName}. Le membre et l’équipe peuvent maintenant discuter dedans.`,
+    );
+    showToast(`🎫 Ticket ouvert pour ${memberLabel} dans #${data.channelName} !`);
+
+    manualTicketMember = null;
+    renderManualTicketSelectedMember();
+    renderManualMemberResults([]);
+    const search = $('#manualTicketMemberSearch');
+    if (search) search.value = '';
+    if (subjectInput) subjectInput.value = '';
+    fillTicketTypeForm();
+  } catch (err) {
+    setManualTicketFeedback('error', `❌ ${err.message}`);
     showToast('❌ ' + err.message, true);
   } finally {
     btn.disabled = false;

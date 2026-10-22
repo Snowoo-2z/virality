@@ -16,6 +16,7 @@
     </div>
     <div class="spacer"></div>
     <div class="status-badge" id="statusBadge"><span class="dot"></span><span id="statusText">Chargement...</span></div>
+    <a class="btn btn-ghost btn-sm" href="/commandes" title="Ouvrir la mini-interface d'envoi dans #commandes">⚡ Commandes</a>
     <button class="btn btn-ghost btn-sm" id="refreshBtn" title="Actualiser le statut, les Salons et les rôles">🔄 Actualiser</button>
     <button class="btn btn-ghost btn-sm" id="logoutBtn">🚪 Déconnexion</button>
   </header>
@@ -342,6 +343,34 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <section class="card manual-ticket-card">
+        <h2>⚡ Ouvrir un ticket en 1 clic</h2>
+        <p class="desc">Pas besoin d'attendre que la personne clique sur Discord : cherche son pseudo, choisis par exemple <b>Partenariat</b> ou <b>Devenir clipper</b>, puis le bot crée automatiquement le salon privé, envoie le message d'accueil et ping l'équipe du type choisi.</p>
+
+        <div class="grid-2 manual-ticket-grid">
+          <div class="member-search-wrap">
+            <label class="field-label" for="manualTicketMemberSearch">👤 Membre concerné</label>
+            <input type="search" id="manualTicketMemberSearch" placeholder="Tape au moins 2 lettres du pseudo…" autocomplete="off" />
+            <div class="member-results" id="manualTicketMemberResults" aria-live="polite"></div>
+            <div class="selected-member" id="manualTicketSelectedMember" hidden></div>
+          </div>
+
+          <div>
+            <label class="field-label" for="manualTicketType">🎛️ Type de ticket</label>
+            <select id="manualTicketType"></select>
+            <p class="hint">Les choix viennent des boutons configurés juste en dessous. En cliquant sur le bouton ci-dessous, les réglages affichés sont enregistrés puis le ticket est créé.</p>
+          </div>
+        </div>
+
+        <label class="field-label" for="manualTicketSubject">📝 Sujet <span class="muted">(optionnel)</span></label>
+        <input type="text" id="manualTicketSubject" maxlength="200" placeholder="Ex : Demande de partenariat, candidature clipper…" />
+
+        <div style="margin-top:16px">
+          <button type="button" class="btn btn-primary" id="createManualTicketBtn">🎫 Ouvrir le ticket automatiquement</button>
+        </div>
+        <div class="manual-ticket-feedback" id="manualTicketFeedback" role="status" aria-live="polite"></div>
       </section>
 
       <section class="card">
