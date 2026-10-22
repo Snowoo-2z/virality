@@ -466,12 +466,14 @@ select:disabled, input:disabled { opacity: 0.55; }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .toast.error { border-color: var(--red); }
 
-/* ---------- Ouverture manuelle d'un ticket ---------- */
-.manual-ticket-card {
+/* ---------- Tickets à l’arrivée + ouverture manuelle ---------- */
+.manual-ticket-card,
+.auto-join-ticket-card {
   position: relative;
   overflow: hidden;
 }
-.manual-ticket-card::before {
+.manual-ticket-card::before,
+.auto-join-ticket-card::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;

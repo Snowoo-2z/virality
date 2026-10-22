@@ -345,6 +345,33 @@
         </div>
       </section>
 
+      <section class="card auto-join-ticket-card">
+        <h2>👋 Ticket automatique à l’arrivée</h2>
+        <p class="desc">Quand c’est allumé, <b>chaque nouveau membre reçoit automatiquement son ticket privé dès qu’il rejoint le serveur</b>. Il n’a pas besoin de cliquer sur le panneau.</p>
+
+        <div class="switch-row">
+          <div class="txt"><b>Créer un ticket à chaque nouvelle arrivée</b><span>Le bot crée le salon, envoie le message d’accueil du type choisi et ping les personnes prévues</span></div>
+          <label class="switch"><input type="checkbox" data-bind="tickets.autoCreateOnJoin" /><span class="track"></span></label>
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label class="field-label" for="autoJoinTicketType">🎛️ Type de ticket à ouvrir</label>
+            <select id="autoJoinTicketType"></select>
+            <p class="hint">Choisis par exemple <b>Devenir clipper</b>. Son message d’ouverture, sa catégorie, ses rôles staff et son IA seront utilisés.</p>
+          </div>
+          <div>
+            <label class="field-label" for="autoJoinTicketSubject">📝 Sujet du ticket</label>
+            <input type="text" id="autoJoinTicketSubject" data-bind="tickets.autoCreateOnJoinSubject" maxlength="200" placeholder="Bienvenue sur Virality 👋" />
+            <p class="hint">Ce petit sujet s’affiche dans le ticket du nouveau membre.</p>
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <button type="button" class="btn btn-primary" id="saveAutoJoinTicketBtn">💾 Enregistrer l’arrivée automatique</button>
+        </div>
+      </section>
+
       <section class="card manual-ticket-card">
         <h2>⚡ Ouvrir un ticket en 1 clic</h2>
         <p class="desc">Pas besoin d'attendre que la personne clique sur Discord : cherche son pseudo, choisis par exemple <b>Partenariat</b> ou <b>Devenir clipper</b>, puis le bot crée automatiquement le salon privé, envoie le message d'accueil et ping l'équipe du type choisi.</p>

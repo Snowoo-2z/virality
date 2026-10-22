@@ -92,13 +92,16 @@ function createClient() {
     }
   });
 
-  // Arrivée d'un nouveau membre -> bienvenue + rôle auto
+  // Arrivée d'un nouveau membre -> bienvenue + rôle auto + ticket privé automatique
   client.on(Events.GuildMemberAdd, async (member) => {
     if (member.guild.id !== GUILD_ID) return;
     if (member.user.bot) return; // pas de bienvenue pour les autres bots
     console.log(`👋 Nouveau membre : ${member.user.tag}`);
-    await sendWelcome(member);
     applyAutoRole(member);
+    await Promise.allSettled([
+      sendWelcome(member),
+      tickets.maybeCreateAutoTicketOnJoin(member),
+    ]);
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {

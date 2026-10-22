@@ -47,6 +47,18 @@ L'embed part tout seul dans le salon commandes.
 Cette page ne montre aucun autre reglage.
 
 --------------------------------------------------
+NOUVEAU : ticket automatique a l'arrivee
+--------------------------------------------------
+Quand un nouveau membre rejoint le serveur,
+le bot lui cree automatiquement un ticket.
+Pour choisir le type de ticket :
+1) Ouvre le dashboard normal.
+2) Clique l'onglet Tickets.
+3) Dans "Ticket automatique a l'arrivee",
+   choisis le type voulu.
+4) Clique "Enregistrer l'arrivee automatique".
+
+--------------------------------------------------
 NOUVEAU : ouvrir un ticket depuis le dashboard
 --------------------------------------------------
 1) Ouvre le dashboard normal.

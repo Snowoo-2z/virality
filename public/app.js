@@ -102,6 +102,15 @@ function collectForm() {
       type.staffRoleIds = boxes.filter((b) => b.checked).map((b) => b.value);
     }
   }
+
+  // Type ouvert automatiquement quand un nouveau membre rejoint le serveur
+  const autoJoinTypeEl = $('#autoJoinTicketType');
+  if (autoJoinTypeEl && config.tickets) {
+    const knownIds = new Set((config.tickets.types || []).map((t) => t.id));
+    config.tickets.autoCreateOnJoinTypeId = knownIds.has(autoJoinTypeEl.value)
+      ? autoJoinTypeEl.value
+      : (config.tickets.types?.[0]?.id || '');
+  }
 }
 
 /* Affiche/masque les blocs selon les réglages (ex : embed vs texte) */
@@ -337,6 +346,7 @@ function fillTicketTypeForm() {
   select.value = String(ticketTypeIndex);
   $('#deleteTicketTypeBtn').disabled = config.tickets.types.length <= 1;
   syncManualTicketTypes();
+  syncAutoJoinTicketTypes();
 
   const set = (id, value) => { const el = document.getElementById(id); if (el) el.value = value ?? ''; };
   const setCheck = (id, value) => { const el = document.getElementById(id); if (el) el.checked = Boolean(value); };
@@ -384,11 +394,10 @@ function refreshTicketTypeEditor() {
   updateTicketPreview();
 }
 
-/* ------------- Tickets : ouverture manuelle en 1 clic ------------- */
-function syncManualTicketTypes() {
-  const select = $('#manualTicketType');
+/* ------------- Tickets : listes de types (manuel + arrivée auto) ------------- */
+function syncTicketTypePicker(select, preferredId = '') {
   if (!select || !config?.tickets) return;
-  const previous = select.value;
+  const previous = preferredId || select.value;
   const types = Array.isArray(config.tickets.types) ? config.tickets.types : [];
 
   select.replaceChildren();
@@ -409,6 +418,14 @@ function syncManualTicketTypes() {
   }
   select.disabled = false;
   select.value = types.some((type) => type.id === previous) ? previous : (types[0].id || '');
+}
+
+function syncManualTicketTypes() {
+  syncTicketTypePicker($('#manualTicketType'));
+}
+
+function syncAutoJoinTicketTypes() {
+  syncTicketTypePicker($('#autoJoinTicketType'), config?.tickets?.autoCreateOnJoinTypeId || '');
 }
 
 function setManualTicketFeedback(type, message) {
@@ -1259,6 +1276,12 @@ $('#publishPanelBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = originalLabel;
   }
+});
+
+/* ---------- Tickets : enregistrement du réglage d'arrivée automatique ---------- */
+$('#saveAutoJoinTicketBtn')?.addEventListener('click', () => {
+  // Réutilise le gros bouton d'enregistrement général (déjà testé partout).
+  $('#saveBtn')?.click();
 });
 
 /* ---------- Tickets : ouverture manuelle depuis le dashboard ---------- */

@@ -33,6 +33,8 @@ const OPEN_BUTTON_ID = 'ticket:open'; // anciens panneaux : 'ticket:open' | nouv
 const CLOSE_BUTTON_ID = 'ticket:close';
 const MODAL_ID = 'ticket:modal:create'; // + ':<typeId>' pour les nouveaux panneaux
 const ORANGE = 0xff6a00;
+const autoJoinTicketsInFlight = new Set(); // évite un doublon si l'événement d'arrivée se répète
+let ticketCreationQueue = Promise.resolve(); // un ticket à la fois : numéros et catégories toujours propres
 
 const BUTTON_STYLES = {
   Primary: ButtonStyle.Primary,
@@ -257,9 +259,18 @@ async function resolveCategory(guild, me, cfg, type) {
 
 /**
  * Crée un ticket normal pour un membre donné.
- * Utilisé par les boutons discord ET par l'ouverture manuelle du dashboard.
+ * Utilisé par les boutons discord, l'ouverture manuelle du dashboard
+ * et l'ouverture automatique à l'arrivée d'un nouveau membre.
+ * Les créations passent une par une pour éviter les numéros en double
+ * quand plusieurs membres arrivent ou cliquent en même temps.
  */
-async function createTicketForMember({ guild, member, subject = '', typeKey = null, openedBy = 'member' } = {}) {
+function createTicketForMember(options = {}) {
+  const run = ticketCreationQueue.then(() => createTicketForMemberNow(options));
+  ticketCreationQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
+async function createTicketForMemberNow({ guild, member, subject = '', typeKey = null, openedBy = 'member' } = {}) {
   const cfg = getConfig().tickets;
   if (!cfg.enabled) {
     return { ok: false, reason: 'Le système de tickets est désactivé. Active-le en haut de l\'onglet Tickets, puis enregistre.' };
@@ -296,7 +307,11 @@ async function createTicketForMember({ guild, member, subject = '', typeKey = nu
     parent: category.id,
     topic,
     permissionOverwrites: baseOverwrites(guild, me, staffIds, member.id),
-    reason: `Ticket ${openedBy === 'dashboard' ? 'ouvert depuis le dashboard pour' : 'ouvert par'} ${member.user.tag}${type ? ` (${type.name})` : ''}`,
+    reason: `Ticket ${openedBy === 'dashboard'
+      ? 'ouvert depuis le dashboard pour'
+      : openedBy === 'auto-join'
+        ? 'ouvert automatiquement à l\'arrivée de'
+        : 'ouvert par'} ${member.user.tag}${type ? ` (${type.name})` : ''}`,
   });
 
   cfg.counter = number;
@@ -325,6 +340,12 @@ async function createTicketForMember({ guild, member, subject = '', typeKey = nu
       value: 'Ticket créé directement par l\'équipe depuis le dashboard.',
     });
   }
+  if (openedBy === 'auto-join' && openEmbed && canAddEmbedField()) {
+    openEmbed.addFields({
+      name: '👋 Bienvenue',
+      value: 'Ticket créé automatiquement à ton arrivée sur le serveur.',
+    });
+  }
 
   const shouldPingStaff = type ? type.pingStaff : cfg.pingStaff;
   const pings = [`<@${member.id}>`];
@@ -348,6 +369,47 @@ async function createTicketForMember({ guild, member, subject = '', typeKey = nu
     typeId: type?.id || null,
     typeName: type?.name || null,
   };
+}
+
+/**
+ * Ouvre automatiquement le ticket d'accueil d'un membre qui vient
+ * de rejoindre le serveur, si l'option est activée dans le dashboard.
+ */
+async function maybeCreateAutoTicketOnJoin(member) {
+  const cfg = getConfig().tickets;
+  if (!cfg.enabled || !cfg.autoCreateOnJoin || !member?.guild || !member?.user || member.user.bot) {
+    return { ok: false, skipped: true, reason: 'Ticket automatique à l\'arrivée désactivé.' };
+  }
+
+  const flightKey = `${member.guild.id}:${member.id}`;
+  if (autoJoinTicketsInFlight.has(flightKey)) {
+    return { ok: false, skipped: true, reason: 'Création du ticket d\'arrivée déjà en cours.' };
+  }
+
+  autoJoinTicketsInFlight.add(flightKey);
+  try {
+    const result = await createTicketForMember({
+      guild: member.guild,
+      member,
+      subject: cfg.autoCreateOnJoinSubject || '',
+      typeKey: cfg.autoCreateOnJoinTypeId || null,
+      openedBy: 'auto-join',
+    });
+
+    if (result.ok) {
+      console.log(`🎫 Ticket d'arrivée créé pour ${member.user.tag} : #${result.channelName}${result.typeName ? ` (${result.typeName})` : ''}`);
+    } else if (result.alreadyExists) {
+      console.log(`🎫 ${member.user.tag} avait déjà un ticket ouvert (#${result.channelName || 'ticket existant'}) : aucun doublon créé.`);
+    } else {
+      console.warn(`⚠️  Ticket d'arrivée non créé pour ${member.user.tag} : ${result.reason || 'raison inconnue'}`);
+    }
+    return result;
+  } catch (err) {
+    console.warn(`⚠️  Ticket d'arrivée non créé pour ${member.user.tag} : ${err.message}`);
+    return { ok: false, reason: err.message };
+  } finally {
+    autoJoinTicketsInFlight.delete(flightKey);
+  }
 }
 
 /** Ouverture depuis un bouton / formulaire discord (comportement historique). */
@@ -813,6 +875,7 @@ module.exports = {
   handleMessage,
   publishPanel,
   createTicketForMember,
+  maybeCreateAutoTicketOnJoin,
   // Exportés pour les tests
   sanitizeChannelName,
   ticketChannelName,

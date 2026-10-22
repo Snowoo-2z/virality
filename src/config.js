@@ -193,6 +193,11 @@ const DEFAULTS = {
       '1562040906603823124', // modérateur en Test
     ],
     maxPerUser: 1,
+    // À chaque nouvelle arrivée sur le serveur, le bot ouvre automatiquement
+    // un ticket privé pour le membre (type + sujet réglables dans le dashboard).
+    autoCreateOnJoin: true,
+    autoCreateOnJoinTypeId: 'support', // les anciennes configs choisissent auto le type accueil/clipper si présent
+    autoCreateOnJoinSubject: 'Bienvenue sur Virality 👋',
     namePattern: 'ticket-{number}',
     counter: 0,
     askSubject: true,
@@ -703,6 +708,24 @@ function normalizeTickets(input) {
     const n = Number(v);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback;
   };
+
+  const types = normalizeTicketTypes(t);
+  const requestedAutoTypeId = String(t.autoCreateOnJoinTypeId ?? '').trim();
+  const simpleTypeText = (type) => [type?.id, type?.name, type?.buttonLabel, type?.categoryName]
+    .map((value) => String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, ''))
+    .join(' ');
+  const preferredAutoTerms = ['devenirclipper', 'clipper', 'bienvenue', 'accueil', 'inscription', 'onboarding'];
+  const preferredAutoType = preferredAutoTerms
+    .map((term) => types.find((type) => simpleTypeText(type).includes(term)))
+    .find(Boolean);
+  const autoCreateOnJoinTypeId = types.some((type) => type.id === requestedAutoTypeId)
+    ? requestedAutoTypeId
+    : (preferredAutoType?.id || types[0]?.id || '');
+
   return {
     enabled: Boolean(t.enabled ?? def.enabled),
     panelChannelId: String(t.panelChannelId ?? '').trim(),
@@ -711,6 +734,11 @@ function normalizeTickets(input) {
     categoryName: String(t.categoryName ?? def.categoryName).trim().slice(0, 100) || def.categoryName,
     staffRoleIds: normalizeRoleIdList(t.staffRoleIds, def.staffRoleIds),
     maxPerUser: intInRange(t.maxPerUser, 1, 10, def.maxPerUser),
+    autoCreateOnJoin: Boolean(t.autoCreateOnJoin ?? def.autoCreateOnJoin),
+    autoCreateOnJoinTypeId,
+    autoCreateOnJoinSubject: String(t.autoCreateOnJoinSubject ?? def.autoCreateOnJoinSubject)
+      .trim()
+      .slice(0, 200),
     namePattern: String(t.namePattern ?? def.namePattern).trim().slice(0, 60) || def.namePattern,
     counter: intInRange(t.counter, 0, 999999, 0),
     askSubject: Boolean(t.askSubject ?? def.askSubject),
@@ -724,7 +752,7 @@ function normalizeTickets(input) {
     openEmbed: normalizeGenericEmbed(t.openEmbed, def.openEmbed),
     migratedTypes: true,
     ai: normalizeTicketAi(t.ai),
-    types: normalizeTicketTypes(t),
+    types,
   };
 }
 
